@@ -592,6 +592,72 @@ main::before {
   margin-bottom: 1rem;
 }
 
+.day-switcher {
+  display: flex;
+  gap: 0.6rem;
+  margin: 0 0 1rem;
+  padding: 0.2rem 0.1rem 0.75rem;
+  overflow-x: auto;
+  scroll-padding-inline: 1rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.day-switcher::-webkit-scrollbar {
+  height: 0;
+}
+
+.day-chip {
+  flex: 0 0 auto;
+  min-width: 9.4rem;
+  min-height: 4.3rem;
+  padding: 0.78rem 0.9rem;
+  color: var(--ink);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(255, 250, 242, 0.92));
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: 0 10px 24px rgba(72, 43, 25, 0.08);
+  text-align: left;
+  transition:
+    transform 160ms var(--ease),
+    background 160ms var(--ease),
+    border-color 160ms var(--ease),
+    box-shadow 160ms var(--ease);
+}
+
+.day-chip strong,
+.day-chip span {
+  display: block;
+}
+
+.day-chip strong {
+  margin-bottom: 0.22rem;
+  font-size: 1rem;
+}
+
+.day-chip span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.day-chip.active {
+  color: #fff;
+  background:
+    radial-gradient(circle at 88% 18%, rgba(255, 239, 183, 0.35), transparent 3.5rem),
+    linear-gradient(135deg, var(--clay), var(--emerald-dark));
+  border-color: rgba(255, 255, 255, 0.44);
+  box-shadow: 0 16px 38px rgba(72, 43, 25, 0.2);
+}
+
+.day-chip.active span {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.day-chip:active {
+  transform: scale(0.98);
+}
+
 select,
 input,
 textarea {
@@ -668,6 +734,41 @@ textarea {
 .event-time strong {
   font-size: 1.55rem;
   line-height: 1;
+}
+
+.smart-reminder-pill {
+  display: grid;
+  gap: 0.12rem;
+  padding: 0.58rem 0.68rem;
+  background: rgba(15, 111, 97, 0.1);
+  border: 1px solid rgba(15, 111, 97, 0.16);
+  border-radius: 15px;
+}
+
+.smart-reminder-pill span {
+  color: var(--emerald-dark);
+  font-size: 0.82rem;
+  font-weight: 950;
+}
+
+.smart-reminder-pill small {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 850;
+}
+
+.smart-reminder-pill.soon {
+  background: rgba(215, 160, 58, 0.18);
+  border-color: rgba(215, 160, 58, 0.3);
+}
+
+.smart-reminder-pill.past {
+  background: rgba(118, 101, 92, 0.1);
+  border-color: rgba(118, 101, 92, 0.14);
+}
+
+.smart-reminder-pill.past span {
+  color: var(--muted);
 }
 
 .event-title-row {
@@ -1279,11 +1380,11 @@ textarea {
   }
 
   .event-time {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr auto;
     align-items: center;
   }
 
-  .event-time label {
+  .event-time .smart-reminder-pill {
     grid-column: 1 / -1;
   }
 }
@@ -1356,6 +1457,16 @@ textarea {
 
   .event-time {
     grid-template-columns: 1fr;
+  }
+
+  .day-switcher {
+    margin-right: -1rem;
+    margin-left: -1rem;
+    padding-inline: 1rem;
+  }
+
+  .day-chip {
+    min-width: 8.6rem;
   }
 
   .photo-actions,

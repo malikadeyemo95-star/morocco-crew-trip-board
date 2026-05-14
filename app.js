@@ -1,5 +1,6 @@
 const clientIdKey = "moroccoCrewClientId";
 const readyNotificationKey = "moroccoReadyNotifications";
+const smartReminderKey = "moroccoSmartReminders";
 const photoBucket = "trip-photos";
 
 const statusOptions = [
@@ -62,6 +63,7 @@ let realtimeChannel = null;
 let realtimeReconnectTimer = null;
 let deletePhotoName = "";
 let pendingPhotoDeleteName = "";
+let selectedDay = "";
 
 const panels = {
   schedule: document.querySelector("#schedulePanel"),
@@ -74,7 +76,7 @@ const eventList = document.querySelector("#eventList");
 const peopleGrid = document.querySelector("#peopleGrid");
 const photoGrid = document.querySelector("#photoGrid");
 const photoUpload = document.querySelector("#photoUpload");
-const dayFilter = document.querySelector("#dayFilter");
+const daySwitcher = document.querySelector("#daySwitcher");
 const toast = document.querySelector("#toast");
 const form = document.querySelector("#eventForm");
 const formTitle = document.querySelector("#formTitle");
@@ -487,6 +489,10 @@ function formatDay(value) {
   }).format(new Date(value));
 }
 
+function formatTime(value) {
+  return new Date(value).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
 function sortedEvents() {
   return [...state.events].sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt));
 }
@@ -498,7 +504,7 @@ function render() {
 
 function renderTripState() {
   renderActiveTraveler();
-  renderDayFilter();
+  renderDaySwitcher();
   renderEvents();
   renderPeople();
   renderNextEvent();
@@ -529,25 +535,59 @@ function renderActiveTraveler() {
   resetIdentityButton.hidden = !state.identityLocked;
 }
 
-function renderDayFilter() {
-  const selected = dayFilter.value || "all";
-  const days = [...new Set(sortedEvents().map((event) => event.startsAt.slice(0, 10)))];
-  dayFilter.innerHTML = [
-    `<option value="all">All days</option>`,
-    ...days.map((day) => `<option value="${day}">${formatDay(`${day}T12:00`)}</option>`),
-  ].join("");
-  dayFilter.value = days.includes(selected) ? selected : "all";
+function getItineraryDays() {
+  return [...new Set(sortedEvents().map((event) => event.startsAt.slice(0, 10)))];
+}
+
+function getTodayKey() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function ensureSelectedDay() {
+  const days = getItineraryDays();
+  if (!days.length) {
+    selectedDay = "";
+    return "";
+  }
+  if (selectedDay && days.includes(selectedDay)) return selectedDay;
+  const today = getTodayKey();
+  selectedDay = days.includes(today) ? today : days[0];
+  return selectedDay;
+}
+
+function renderDaySwitcher() {
+  if (!daySwitcher) return;
+  const days = getItineraryDays();
+  const selected = ensureSelectedDay();
+  daySwitcher.innerHTML = days
+    .map((day) => {
+      const dayEvents = state.events.filter((event) => event.startsAt.startsWith(day));
+      const isSelected = selected === day;
+      const date = new Date(`${day}T12:00`);
+      const weekday = new Intl.DateTimeFormat(undefined, { weekday: "long" }).format(date);
+      const shortDate = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(date);
+      return `
+        <button class="day-chip${isSelected ? " active" : ""}" type="button" role="tab" aria-selected="${isSelected}" data-action="select-day" data-day="${day}">
+          <strong>${weekday}</strong>
+          <span>${shortDate} · ${dayEvents.length} plan${dayEvents.length === 1 ? "" : "s"}</span>
+        </button>
+      `;
+    })
+    .join("");
 }
 
 function renderEvents() {
-  const selectedDay = dayFilter.value;
-  const events = sortedEvents().filter(
-    (event) => selectedDay === "all" || event.startsAt.startsWith(selectedDay),
-  );
+  const day = ensureSelectedDay();
+  const events = sortedEvents().filter((event) => event.startsAt.startsWith(day));
+  const dayLabel = day ? new Intl.DateTimeFormat(undefined, { weekday: "long" }).format(new Date(`${day}T12:00`)) : "this day";
 
   eventList.innerHTML = events.length
     ? events.map(renderEventCard).join("")
-    : `<div class="empty-state"><span aria-hidden="true">Plan</span><h4>No events for this day yet.</h4><p>Add a plan when the crew has something locked in.</p></div>`;
+    : `<div class="empty-state"><span aria-hidden="true">Plan</span><h4>No activities planned for ${dayLabel} yet.</h4><p>Add a plan when the crew has something locked in.</p></div>`;
 }
 
 function renderEventCard(event) {
@@ -556,6 +596,8 @@ function renderEventCard(event) {
   const activePersonId = getActiveTravelerId();
   const activePerson = state.people.find((person) => person.id === activePersonId);
   const activeStatus = activePerson ? event.checkins[activePerson.id] || "not-ready" : "";
+  const reminder = getSmartReminder(event);
+  const reminderStatus = getReminderStatus(event);
 
   const myStatus = activePerson
     ? `
@@ -601,15 +643,11 @@ function renderEventCard(event) {
     <article class="event-card">
       <div class="event-time">
         <span class="event-day">${formatDay(event.startsAt)}</span>
-        <strong>${new Date(event.startsAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</strong>
-        <label>
-          Alarm
-          <select data-action="alarm" data-event-id="${event.id}">
-            ${[15, 30, 45, 60, 90, 120]
-              .map((minutes) => `<option value="${minutes}" ${event.alarmOffset === minutes ? "selected" : ""}>${minutes} min before</option>`)
-              .join("")}
-          </select>
-        </label>
+        <strong>${formatTime(event.startsAt)}</strong>
+        <div class="smart-reminder-pill ${reminderStatus.tone}">
+          <span>${reminderStatus.label}</span>
+          <small>${reminder.minutes} min before</small>
+        </div>
       </div>
       <div>
         <div class="event-title-row">
@@ -770,6 +808,53 @@ function clearForm() {
   form.reset();
 }
 
+function getSmartReminder(event) {
+  const text = `${event.title} ${event.location || ""} ${event.notes || ""}`.toLowerCase();
+  if (text.includes("casablanca") || text.includes("day trip")) {
+    return { minutes: 90, kind: "leave", label: "Leave soon" };
+  }
+  if (
+    text.includes("arrival") ||
+    text.includes("quad") ||
+    text.includes("camel") ||
+    text.includes("kart") ||
+    text.includes("medina") ||
+    text.includes("souk") ||
+    text.includes("club") ||
+    text.includes("dinner") ||
+    text.includes("reservation") ||
+    text.includes("reserved")
+  ) {
+    return { minutes: 60, kind: "ready", label: "Get ready soon" };
+  }
+  if (text.includes("pool") || text.includes("home") || text.includes("chill")) {
+    return { minutes: 30, kind: "ready", label: "Get ready soon" };
+  }
+  return { minutes: 30, kind: "ready", label: "Smart reminder" };
+}
+
+function getReminderStatus(event) {
+  const reminder = getSmartReminder(event);
+  const now = Date.now();
+  const eventAt = new Date(event.startsAt).getTime();
+  const reminderAt = eventAt - reminder.minutes * 60000;
+  if (now > eventAt) return { label: "Activity time passed", tone: "past" };
+  if (now >= reminderAt) return { label: reminder.label, tone: "soon" };
+  return { label: "Smart reminder on", tone: "on" };
+}
+
+function getSmartReminderLog() {
+  try {
+    return JSON.parse(localStorage.getItem(smartReminderKey)) || [];
+  } catch {
+    return [];
+  }
+}
+
+function saveSmartReminderLog(ids) {
+  localStorage.setItem(smartReminderKey, JSON.stringify([...new Set(ids)]));
+}
+
 function playAlarmSound() {
   const audioContext = new AudioContext();
   const oscillator = audioContext.createOscillator();
@@ -787,19 +872,29 @@ function playAlarmSound() {
 
 function checkAlarms() {
   const now = Date.now();
+  const fired = getSmartReminderLog();
+  let changed = false;
   state.events.forEach((event) => {
-    const alarmAt = new Date(event.startsAt).getTime() - event.alarmOffset * 60000;
+    const reminder = getSmartReminder(event);
+    const alarmAt = new Date(event.startsAt).getTime() - reminder.minutes * 60000;
     const eventAt = new Date(event.startsAt).getTime();
-    if (!event.alarmed && now >= alarmAt && now <= eventAt + 60000) {
-      event.alarmed = true;
-      const message = `${event.title} starts in ${event.alarmOffset} minutes.`;
+    const reminderId = `${event.id}:${event.startsAt}:${reminder.minutes}`;
+    if (!fired.includes(reminderId) && now >= alarmAt && now <= eventAt) {
+      const message = `${reminder.label}: ${event.title} at ${formatTime(event.startsAt)}.`;
       showToast(message);
-      playAlarmSound();
-      if (Notification.permission === "granted") {
-        new Notification("Morocco Crew alarm", { body: message });
+      try {
+        playAlarmSound();
+      } catch {
+        // Some mobile browsers block audio until the user interacts; the toast remains the fallback.
       }
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification("Morocco Crew reminder", { body: message });
+      }
+      fired.push(reminderId);
+      changed = true;
     }
   });
+  if (changed) saveSmartReminderLog(fired);
 }
 
 function getReadyNotifications() {
@@ -844,8 +939,6 @@ document.querySelector("#addEventButton").addEventListener("click", () => {
 });
 
 document.querySelector("#cancelEditButton").addEventListener("click", clearForm);
-
-dayFilter.addEventListener("change", renderEvents);
 
 activeTraveler.addEventListener("change", async (event) => {
   if (!event.target.value) return;
@@ -977,12 +1070,6 @@ document.body.addEventListener("change", async (event) => {
       showToast(error.message);
     }
   }
-  if (action === "alarm") {
-    const tripEvent = state.events.find((item) => item.id === target.dataset.eventId);
-    tripEvent.alarmOffset = Number(target.value);
-    tripEvent.alarmed = false;
-    await pushEvent(tripEvent).catch((error) => showToast(error.message));
-  }
 });
 
 document.body.addEventListener("click", async (event) => {
@@ -999,6 +1086,11 @@ document.body.addEventListener("click", async (event) => {
     } catch (error) {
       showToast(error.message);
     }
+  }
+  if (action === "select-day") {
+    selectedDay = target.dataset.day || selectedDay;
+    renderDaySwitcher();
+    renderEvents();
   }
   if (action === "checkin-choice") {
     if (!state.identityLocked || target.dataset.personId !== getActiveTravelerId()) {

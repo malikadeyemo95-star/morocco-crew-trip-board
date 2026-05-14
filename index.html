@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Morocco Crew Trip Board</title>
-    <link rel="stylesheet" href="styles.css?v=20260514-simple-status-board" />
+    <link rel="stylesheet" href="styles.css?v=20260514-day-smart-reminders" />
   </head>
   <body>
     <div class="app-shell">
@@ -59,7 +59,7 @@
             <h2>Know who is ready before every plan</h2>
           </div>
           <div class="topbar-actions">
-            <button class="secondary-button" id="notifyButton" type="button">Enable notifications</button>
+            <button class="secondary-button" id="notifyButton" type="button">Enable smart reminders</button>
             <button class="primary-button" id="addEventButton" type="button">Add event</button>
           </div>
         </section>
@@ -83,8 +83,8 @@
               <p class="eyebrow">Plan</p>
               <h3>Trip Itinerary</h3>
             </div>
-            <select id="dayFilter" aria-label="Filter by day"></select>
           </div>
+          <div class="day-switcher" id="daySwitcher" role="tablist" aria-label="Choose itinerary day"></div>
           <div class="event-list" id="eventList"></div>
         </section>
 
@@ -190,7 +190,7 @@
       window.TRIP_CONFIG = window.TRIP_CONFIG || {};
     </script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="config.js?v=20260514-simple-status-board"></script>
-    <script src="app.js?v=20260514-simple-status-board"></script>
+    <script src="config.js?v=20260514-day-smart-reminders"></script>
+    <script src="app.js?v=20260514-day-smart-reminders"></script>
   </body>
 </html>
