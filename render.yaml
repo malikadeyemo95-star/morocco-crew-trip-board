@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: morocco-crew-trip-board
+    runtime: node
+    plan: starter
+    region: frankfurt
+    buildCommand: npm install
+    startCommand: npm start
+    disk:
+      name: trip-data
+      mountPath: /opt/render/project/src/storage
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATA_FILE
+        value: /opt/render/project/src/storage/trip-state.json

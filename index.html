@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Morocco Crew Trip Board</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Trip navigation">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">M</div>
+          <div>
+            <p class="eyebrow">Seven-person trip</p>
+            <h1>Morocco Crew</h1>
+          </div>
+        </div>
+
+        <nav class="tabs" aria-label="Sections">
+          <button class="tab-button active" type="button" data-tab="schedule">
+            <span class="nav-dot" aria-hidden="true"></span>
+            Itinerary
+          </button>
+          <button class="tab-button" type="button" data-tab="people">
+            <span class="nav-dot nav-dot-ring" aria-hidden="true"></span>
+            Crew
+          </button>
+          <button class="tab-button" type="button" data-tab="settings">
+            <span class="nav-dot nav-dot-split" aria-hidden="true"></span>
+            Setup
+          </button>
+        </nav>
+
+        <div class="trip-card">
+          <p class="eyebrow">Next up</p>
+          <h2 id="nextEventTitle">Loading...</h2>
+          <p id="nextEventTime"></p>
+          <div class="countdown" id="nextCountdown">--</div>
+        </div>
+
+        <div class="identity-card">
+          <label for="activeTraveler">
+            <span class="eyebrow">You are</span>
+            <select id="activeTraveler"></select>
+          </label>
+          <button class="identity-reset" id="resetIdentityButton" type="button">Change traveler</button>
+        </div>
+      </aside>
+
+      <main>
+        <section class="topbar">
+          <div>
+            <p class="eyebrow">Shared readiness tracker</p>
+            <h2>Know who is ready before every plan</h2>
+          </div>
+          <div class="topbar-actions">
+            <button class="secondary-button" id="notifyButton" type="button">Enable alarms</button>
+            <button class="primary-button" id="addEventButton" type="button">Add event</button>
+          </div>
+        </section>
+
+        <section class="morocco-strip" aria-label="Morocco trip mood board">
+          <div class="tile tile-courtyard">
+            <span class="arch arch-left"></span>
+            <span class="arch arch-center"></span>
+            <span class="arch arch-right"></span>
+          </div>
+          <div class="tile tile-zellige"></div>
+          <div class="tile tile-sunset"></div>
+          <div class="tile tile-lantern">
+            <span></span>
+          </div>
+        </section>
+
+        <section class="tab-panel active" id="schedulePanel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Plan</p>
+              <h3>Trip Itinerary</h3>
+            </div>
+            <select id="dayFilter" aria-label="Filter by day"></select>
+          </div>
+          <div class="event-list" id="eventList"></div>
+        </section>
+
+        <section class="tab-panel" id="peoplePanel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Crew</p>
+              <h3>Traveler Names</h3>
+            </div>
+          </div>
+          <div class="people-grid" id="peopleGrid"></div>
+        </section>
+
+        <section class="tab-panel" id="settingsPanel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Import</p>
+              <h3>Quick Setup</h3>
+            </div>
+          </div>
+          <div class="setup-grid">
+            <form class="editor-panel" id="eventForm">
+              <h4 id="formTitle">Add Event</h4>
+              <label>
+                Event name
+                <input id="eventTitle" required placeholder="Dinner in Marrakech" />
+              </label>
+              <label>
+                Location
+                <input id="eventLocation" placeholder="Medina, Marrakech" />
+              </label>
+              <label>
+                Date and time
+                <input id="eventDateTime" type="datetime-local" required />
+              </label>
+              <label>
+                Notes
+                <textarea id="eventNotes" rows="4" placeholder="Dress code, pickup point, tickets..."></textarea>
+              </label>
+              <div class="form-actions">
+                <button class="secondary-button" id="cancelEditButton" type="button">Cancel</button>
+                <button class="primary-button" type="submit">Save event</button>
+              </div>
+            </form>
+
+            <div class="editor-panel">
+              <h4>Reset Demo Data</h4>
+              <button class="danger-button" id="resetButton" type="button">Reset sample itinerary</button>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
