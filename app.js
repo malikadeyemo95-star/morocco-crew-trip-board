@@ -61,7 +61,6 @@ let editingEventId = null;
 let realtimeChannel = null;
 let realtimeReconnectTimer = null;
 let deletePhotoName = "";
-let downloadPhotoName = "";
 let pendingPhotoDeleteName = "";
 
 const panels = {
@@ -194,7 +193,7 @@ async function refreshState({ quiet = false } = {}) {
     state.reservations = Object.fromEntries(reservations.map((row) => [row.person_id, row.client_id]));
     state.activePersonId = Object.entries(state.reservations).find(([, owner]) => owner === clientId)?.[0] || "";
     state.identityLocked = Boolean(state.activePersonId);
-    render();
+    renderTripState();
     checkReadyNotifications();
   } catch (error) {
     if (!quiet) showToast("Shared database is not reachable.");
@@ -298,6 +297,14 @@ async function downloadPhoto(photoName) {
     throw new Error("That photo could not be downloaded safely.");
   }
 
+  if (isIosDevice()) {
+    const opened = window.open(photo.url, "_blank", "noopener,noreferrer");
+    if (!opened) {
+      window.location.href = photo.url;
+    }
+    return "Image opened. Long press to save to Photos.";
+  }
+
   const response = await fetch(photo.url);
   if (!response.ok) {
     throw new Error("Could not prepare that photo for download.");
@@ -311,7 +318,12 @@ async function downloadPhoto(photoName) {
   document.body.append(link);
   link.click();
   link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+  window.setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
+  return "Photo download started.";
+}
+
+function isIosDevice() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 }
 
 async function claimTraveler(personId) {
@@ -480,11 +492,15 @@ function sortedEvents() {
 }
 
 function render() {
+  renderTripState();
+  renderPhotos();
+}
+
+function renderTripState() {
   renderActiveTraveler();
   renderDayFilter();
   renderEvents();
   renderPeople();
-  renderPhotos();
   renderNextEvent();
 }
 
@@ -639,9 +655,7 @@ function renderPhotos() {
           </a>
           <span>${escapeHtml(photo.name)}</span>
           <div class="photo-actions">
-            <button class="secondary-button photo-action" type="button" data-action="download-photo" data-photo-name="${escapeAttribute(photo.name)}" ${downloadPhotoName === photo.name ? "disabled" : ""}>
-              ${downloadPhotoName === photo.name ? "Preparing..." : "Download"}
-            </button>
+            <button class="secondary-button photo-action" type="button" data-action="download-photo" data-photo-name="${escapeAttribute(photo.name)}">Download</button>
             <button class="danger-button photo-action" type="button" data-action="delete-photo" data-photo-name="${escapeAttribute(photo.name)}" ${deletePhotoName === photo.name ? "disabled" : ""}>
               ${deletePhotoName === photo.name ? "Deleting..." : "Delete"}
             </button>
@@ -967,16 +981,17 @@ document.body.addEventListener("click", async (event) => {
   }
   if (action === "download-photo") {
     const photoName = target.dataset.photoName || "";
+    const originalText = target.textContent;
     try {
-      downloadPhotoName = photoName;
-      renderPhotos();
-      await downloadPhoto(photoName);
-      showToast("Photo download started.");
+      target.disabled = true;
+      target.textContent = "Preparing...";
+      const message = await downloadPhoto(photoName);
+      showToast(message);
     } catch (error) {
       showToast(error.message);
     } finally {
-      downloadPhotoName = "";
-      renderPhotos();
+      target.disabled = false;
+      target.textContent = originalText;
     }
   }
   if (action === "delete-photo") {
