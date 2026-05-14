@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Morocco Crew Trip Board</title>
-    <link rel="stylesheet" href="styles.css?v=20260514-expenses-compact-status" />
+    <link rel="stylesheet" href="styles.css?v=20260514-shared-expenses" />
   </head>
   <body>
     <div class="app-shell">
@@ -121,6 +121,7 @@
           </div>
           <div class="expense-shell">
             <section class="expense-overview" id="expenseOverview" aria-label="Expense overview"></section>
+            <div class="expense-sync-notice" id="expenseSyncNotice" hidden></div>
             <section class="expense-card expense-form-card">
               <div class="expense-card-heading">
                 <div>
@@ -245,7 +246,7 @@
       window.TRIP_CONFIG = window.TRIP_CONFIG || {};
     </script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="config.js?v=20260514-expenses-compact-status"></script>
-    <script src="app.js?v=20260514-expenses-compact-status"></script>
+    <script src="config.js?v=20260514-shared-expenses"></script>
+    <script src="app.js?v=20260514-shared-expenses"></script>
   </body>
 </html>

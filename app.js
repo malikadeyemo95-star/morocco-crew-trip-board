@@ -103,6 +103,7 @@ const expenseDate = document.querySelector("#expenseDate");
 const expenseSplitOptions = document.querySelector("#expenseSplitOptions");
 const settlementList = document.querySelector("#settlementList");
 const expenseList = document.querySelector("#expenseList");
+const expenseSyncNotice = document.querySelector("#expenseSyncNotice");
 const tripSetupDetails = document.querySelector("#tripSetupDetails");
 
 function getClientId() {
@@ -309,6 +310,9 @@ async function addExpense(expense) {
   };
 
   if (!hasSupabase || !expensesShared) {
+    if (hasSupabase && !expensesShared) {
+      showToast("Shared wallet is not connected. Saving locally for this device.");
+    }
     state.expenses = [nextExpense, ...(state.expenses || [])];
     saveLocalExpenses();
     renderExpenses();
@@ -328,6 +332,37 @@ async function addExpense(expense) {
     }),
   });
   await refreshExpenses({ quiet: true });
+}
+
+async function importLocalExpenses() {
+  if (!hasSupabase || !expensesShared) {
+    throw new Error("Connect the shared wallet before importing local expenses.");
+  }
+
+  const localExpenses = getLocalExpenses();
+  const existingIds = new Set((state.expenses || []).map((expense) => expense.id));
+  const expensesToImport = localExpenses.filter((expense) => expense.id && !existingIds.has(expense.id));
+  if (!expensesToImport.length) {
+    showToast("No new local expenses to import.");
+    return;
+  }
+
+  await supabaseFetch("expenses", {
+    method: "POST",
+    prefer: "resolution=merge-duplicates,return=minimal",
+    body: JSON.stringify(
+      expensesToImport.map((expense) => ({
+        id: expense.id,
+        description: expense.description,
+        amount: Number(expense.amount) || 0,
+        paid_by: expense.paidBy,
+        split_between: Array.isArray(expense.splitBetween) ? expense.splitBetween : [],
+        spent_at: expense.spentAt || new Date().toISOString().slice(0, 10),
+      })),
+    ),
+  });
+  await refreshExpenses({ quiet: true });
+  showToast(`${expensesToImport.length} local expense${expensesToImport.length === 1 ? "" : "s"} imported to shared wallet.`);
 }
 
 async function deleteExpense(expenseId) {
@@ -914,6 +949,7 @@ function renderExpenseControls() {
 function renderExpenses() {
   if (!expenseOverview || !settlementList || !expenseList) return;
   const expenses = state.expenses || [];
+  const localExpenses = getLocalExpenses();
   const activePersonId = getActiveTravelerId();
   const totals = getExpenseTotals(expenses);
   const myPaid = activePersonId ? expenses.filter((expense) => expense.paidBy === activePersonId).reduce((sum, expense) => sum + expense.amount, 0) : 0;
@@ -941,9 +977,36 @@ function renderExpenses() {
     </article>
     <article class="expense-stat-card subtle">
       <span>Mode</span>
-      <strong>${expensesShared ? "Shared" : "Local"}</strong>
+      <strong>${expensesShared ? "Shared wallet" : hasSupabase ? "Local backup" : "Local only"}</strong>
     </article>
   `;
+
+  if (expenseSyncNotice) {
+    const importableCount = expensesShared
+      ? localExpenses.filter((expense) => expense.id && !expenses.some((sharedExpense) => sharedExpense.id === expense.id)).length
+      : 0;
+    if (!hasSupabase) {
+      expenseSyncNotice.hidden = false;
+      expenseSyncNotice.className = "expense-sync-notice warning";
+      expenseSyncNotice.innerHTML = `<strong>Local-only wallet.</strong><span>Add Supabase config to share expenses across phones.</span>`;
+    } else if (!expensesShared) {
+      expenseSyncNotice.hidden = false;
+      expenseSyncNotice.className = "expense-sync-notice warning";
+      expenseSyncNotice.innerHTML = `<strong>Shared wallet not connected.</strong><span>The app is using this device's backup expenses until Supabase is reachable.</span>`;
+    } else if (importableCount > 0) {
+      expenseSyncNotice.hidden = false;
+      expenseSyncNotice.className = "expense-sync-notice";
+      expenseSyncNotice.innerHTML = `
+        <strong>${importableCount} local expense${importableCount === 1 ? "" : "s"} found.</strong>
+        <span>Move them into the shared wallet so everyone can see them.</span>
+        <button class="secondary-button" type="button" data-action="import-local-expenses">Import local expenses</button>
+      `;
+    } else {
+      expenseSyncNotice.hidden = false;
+      expenseSyncNotice.className = "expense-sync-notice success";
+      expenseSyncNotice.innerHTML = `<strong>Shared wallet connected.</strong><span>Expenses load from Supabase and sync across devices.</span>`;
+    }
+  }
 
   const settlements = getSettlements(totals.balances);
   settlementList.innerHTML = settlements.length
@@ -1106,6 +1169,9 @@ function switchTab(tab) {
   Object.entries(panels).forEach(([key, panel]) => {
     panel.classList.toggle("active", key === tab);
   });
+  if (tab === "settings") {
+    refreshExpenses({ quiet: true });
+  }
 }
 
 function editEvent(eventId) {
@@ -1471,6 +1537,18 @@ document.body.addEventListener("click", async (event) => {
       showToast(error.message);
     }
   }
+  if (action === "import-local-expenses") {
+    try {
+      target.disabled = true;
+      target.textContent = "Importing...";
+      await importLocalExpenses();
+    } catch (error) {
+      showToast(error.message);
+    } finally {
+      target.disabled = false;
+      target.textContent = "Import local expenses";
+    }
+  }
 });
 
 function scheduleRealtimeReconnect() {
@@ -1495,6 +1573,7 @@ function setupRealtime() {
     .on("postgres_changes", { event: "*", schema: "public", table: "checkins" }, refreshFromRealtime)
     .on("postgres_changes", { event: "*", schema: "public", table: "reservations" }, refreshFromRealtime)
     .on("postgres_changes", { event: "*", schema: "public", table: "events" }, refreshFromRealtime)
+    .on("postgres_changes", { event: "*", schema: "public", table: "expenses" }, () => refreshExpenses({ quiet: true }))
     .on("postgres_changes", { event: "*", schema: "public", table: "people" }, refreshFromRealtime)
     .on(
       "postgres_changes",
