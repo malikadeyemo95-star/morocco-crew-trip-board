@@ -4,7 +4,7 @@ const photoBucket = "trip-photos";
 
 const statusOptions = [
   { value: "not-ready", label: "Not ready" },
-  { value: "dressing", label: "Dressing up" },
+  { value: "dressing", label: "Getting dressed" },
   { value: "ready", label: "Ready" },
   { value: "on-way", label: "On the way" },
   { value: "done", label: "Done" },
@@ -553,33 +553,46 @@ function renderEvents() {
 function renderEventCard(event) {
   const readyCount = state.people.filter((person) => event.checkins[person.id] === "ready").length;
   const doneCount = state.people.filter((person) => event.checkins[person.id] === "done").length;
-  const statusPills = state.people
+  const activePersonId = getActiveTravelerId();
+  const activePerson = state.people.find((person) => person.id === activePersonId);
+  const activeStatus = activePerson ? event.checkins[activePerson.id] || "not-ready" : "";
+
+  const myStatus = activePerson
+    ? `
+      <section class="my-status-card status-${activeStatus}" aria-label="Update my status">
+        <div>
+          <p class="eyebrow">My status</p>
+          <h5>${escapeHtml(activePerson.name)}</h5>
+        </div>
+        <div class="status-choice-grid" role="group" aria-label="Choose your status">
+          ${statusOptions
+            .map((option) => {
+              const selected = activeStatus === option.value ? " active" : "";
+              return `<button class="status-choice${selected} status-${option.value}" type="button" data-action="checkin-choice" data-event-id="${event.id}" data-person-id="${activePerson.id}" data-status="${option.value}" aria-pressed="${activeStatus === option.value}">${option.label}</button>`;
+            })
+            .join("")}
+        </div>
+      </section>
+    `
+    : `
+      <section class="my-status-card pick-traveler" aria-label="Pick traveler first">
+        <p class="eyebrow">My status</p>
+        <h5>Pick your traveler first</h5>
+        <p>Choose your name above to update your status for this plan.</p>
+      </section>
+    `;
+
+  const groupStatuses = state.people
+    .filter((person) => person.id !== activePersonId)
     .map((person) => {
       const status = event.checkins[person.id] || "not-ready";
       const option = statusOptions.find((item) => item.value === status);
-      const className = ` status-${status}`;
-      return `<span class="status-pill${className}">${escapeHtml(person.name)}: ${option.label}</span>`;
-    })
-    .join("");
-
-  const checkins = state.people
-    .map((person) => {
-      const isActivePerson = Boolean(state.identityLocked && person.id === getActiveTravelerId());
-      const options = statusOptions
-        .map((option) => {
-          const selected = (event.checkins[person.id] || "not-ready") === option.value ? "selected" : "";
-          return `<option value="${option.value}" ${selected}>${option.label}</option>`;
-        })
-        .join("");
 
       return `
-        <label class="checkin-card status-${event.checkins[person.id] || "not-ready"}${isActivePerson ? " active-traveler" : " locked-traveler"}">
+        <div class="group-status-row status-${status}">
           <strong>${escapeHtml(person.name)}</strong>
-          <select data-action="checkin" data-event-id="${event.id}" data-person-id="${person.id}" ${isActivePerson ? "" : "disabled"}>
-            ${options}
-          </select>
-          ${isActivePerson ? `<span class="checkin-note">Your status</span>` : `<span class="checkin-note">${state.identityLocked ? "Locked on this device" : "Pick your traveler first"}</span>`}
-        </label>
+          <span class="status-pill status-${status}">${option.label}</span>
+        </div>
       `;
     })
     .join("");
@@ -613,9 +626,17 @@ function renderEventCard(event) {
         <div class="ready-summary" aria-label="Readiness summary">
           <span class="status-pill status-ready">${readyCount}/${state.people.length} ready</span>
           <span class="status-pill status-done">${doneCount}/${state.people.length} done</span>
-          ${statusPills}
         </div>
-        <div class="checkin-grid">${checkins}</div>
+        <div class="status-board">
+          ${myStatus}
+          <section class="group-status-card" aria-label="Group status">
+            <div class="status-section-title">
+              <p class="eyebrow">Group status</p>
+              <span>${state.people.length - (activePerson ? 1 : 0)} travelers</span>
+            </div>
+            <div class="group-status-list">${groupStatuses}</div>
+          </section>
+        </div>
       </div>
     </article>
   `;
@@ -976,6 +997,19 @@ document.body.addEventListener("click", async (event) => {
       await deleteEvent(target.dataset.eventId);
       showToast("Event deleted.");
     } catch (error) {
+      showToast(error.message);
+    }
+  }
+  if (action === "checkin-choice") {
+    if (!state.identityLocked || target.dataset.personId !== getActiveTravelerId()) {
+      renderTripState();
+      showToast(state.identityLocked ? `This device is locked to ${getActiveTravelerName()}.` : "Pick your traveler first.");
+      return;
+    }
+    try {
+      await updateCheckin(target.dataset.eventId, target.dataset.personId, target.dataset.status);
+    } catch (error) {
+      await refreshState({ quiet: true });
       showToast(error.message);
     }
   }

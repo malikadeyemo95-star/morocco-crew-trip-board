@@ -786,6 +786,149 @@ textarea {
   overflow-wrap: anywhere;
 }
 
+.status-board {
+  display: grid;
+  gap: 0.72rem;
+}
+
+.my-status-card,
+.group-status-card {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.85rem;
+  background: rgba(255, 255, 255, 0.66);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  transition:
+    background 180ms var(--ease),
+    border-color 180ms var(--ease),
+    box-shadow 180ms var(--ease);
+}
+
+.my-status-card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(238, 248, 243, 0.76));
+  border-color: rgba(15, 111, 97, 0.28);
+  box-shadow: 0 12px 30px rgba(15, 111, 97, 0.1);
+}
+
+.my-status-card h5 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.my-status-card.pick-traveler {
+  background: rgba(255, 255, 255, 0.66);
+  border-color: var(--line);
+  box-shadow: none;
+}
+
+.my-status-card.pick-traveler p:not(.eyebrow) {
+  margin: 0;
+  color: var(--muted);
+}
+
+.status-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: 0.48rem;
+}
+
+.status-choice {
+  min-height: 3rem;
+  padding: 0.65rem 0.78rem;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  font-weight: 900;
+  text-align: center;
+  transition:
+    transform 160ms var(--ease),
+    background 160ms var(--ease),
+    border-color 160ms var(--ease),
+    box-shadow 160ms var(--ease);
+}
+
+.status-choice:hover {
+  background: #fff;
+  border-color: var(--line-strong);
+  box-shadow: var(--shadow-soft);
+}
+
+.status-choice:active {
+  transform: scale(0.98);
+}
+
+.status-choice.active {
+  color: #fff;
+  background: linear-gradient(135deg, var(--emerald), var(--emerald-dark));
+  border-color: rgba(15, 111, 97, 0.5);
+  box-shadow: 0 12px 26px rgba(15, 111, 97, 0.18);
+}
+
+.status-choice.status-not-ready.active {
+  color: var(--ink);
+  background: linear-gradient(135deg, #f0dfc7, #e5c89d);
+}
+
+.status-choice.status-dressing.active {
+  color: #4d321b;
+  background: linear-gradient(135deg, #f4d78f, #d7a03a);
+}
+
+.status-choice.status-on-way.active {
+  color: #fff;
+  background: linear-gradient(135deg, var(--terracotta), var(--clay));
+}
+
+.status-choice.status-done.active {
+  color: #fff;
+  background: linear-gradient(135deg, var(--blue), #173d52);
+}
+
+.status-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+}
+
+.status-section-title span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 850;
+}
+
+.group-status-list {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.group-status-row {
+  display: flex;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0.6rem;
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid rgba(128, 84, 57, 0.12);
+  border-radius: 15px;
+  transition:
+    background 180ms var(--ease),
+    border-color 180ms var(--ease);
+}
+
+.group-status-row strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.group-status-row .status-pill {
+  flex: 0 0 auto;
+}
+
 .people-grid,
 .setup-grid,
 .photo-grid {
@@ -1200,6 +1343,15 @@ textarea {
 
   .checkin-grid {
     grid-template-columns: 1fr;
+  }
+
+  .status-choice-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .group-status-row {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .event-time {
