@@ -1,4 +1,6 @@
 const clientIdKey = "moroccoCrewClientId";
+const readyNotificationKey = "moroccoReadyNotifications";
+const photoBucket = "trip-photos";
 
 const statusOptions = [
   { value: "not-ready", label: "Not ready" },
@@ -56,11 +58,14 @@ let editingEventId = null;
 const panels = {
   schedule: document.querySelector("#schedulePanel"),
   people: document.querySelector("#peoplePanel"),
+  photos: document.querySelector("#photosPanel"),
   settings: document.querySelector("#settingsPanel"),
 };
 
 const eventList = document.querySelector("#eventList");
 const peopleGrid = document.querySelector("#peopleGrid");
+const photoGrid = document.querySelector("#photoGrid");
+const photoUpload = document.querySelector("#photoUpload");
 const dayFilter = document.querySelector("#dayFilter");
 const toast = document.querySelector("#toast");
 const form = document.querySelector("#eventForm");
@@ -86,6 +91,7 @@ function createDefaultState() {
     people: defaultPeople.map(({ id, name }) => ({ id, name })),
     events: defaultEvents.map((event) => ({ ...event, checkins: { ...event.checkins } })),
     reservations: {},
+    photos: [],
   };
 }
 
@@ -110,6 +116,27 @@ async function supabaseFetch(path, options = {}) {
   if (!response.ok) {
     const text = await response.text();
     throw new Error(text || "Supabase request failed.");
+  }
+
+  if (response.status === 204) return null;
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
+}
+
+async function storageFetch(path, options = {}) {
+  const headers = {
+    apikey: config.supabaseAnonKey,
+    Authorization: `Bearer ${config.supabaseAnonKey}`,
+    ...(options.headers || {}),
+  };
+  const response = await fetch(`${config.supabaseUrl}/storage/v1/${path}`, {
+    ...options,
+    headers,
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || "Storage request failed.");
   }
 
   if (response.status === 204) return null;
@@ -156,9 +183,75 @@ async function refreshState({ quiet = false } = {}) {
     state.activePersonId = Object.entries(state.reservations).find(([, owner]) => owner === clientId)?.[0] || "";
     state.identityLocked = Boolean(state.activePersonId);
     render();
+    checkReadyNotifications();
   } catch (error) {
     if (!quiet) showToast("Shared database is not reachable.");
   }
+}
+
+async function refreshPhotos({ quiet = false } = {}) {
+  if (!hasSupabase) {
+    state.photos = [];
+    renderPhotos();
+    return;
+  }
+
+  try {
+    const photos = await storageFetch(`object/list/${photoBucket}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prefix: "",
+        limit: 100,
+        offset: 0,
+        sortBy: { column: "created_at", order: "desc" },
+      }),
+    });
+
+    state.photos = photos
+      .filter((photo) => photo.name && !photo.name.endsWith("/"))
+      .map((photo) => ({
+        name: photo.name,
+        createdAt: photo.created_at,
+        url: `${config.supabaseUrl}/storage/v1/object/public/${photoBucket}/${encodeURIComponent(photo.name)}`,
+      }));
+    renderPhotos();
+  } catch (error) {
+    if (!quiet) showToast("Photo cloud is not reachable.");
+  }
+}
+
+function sanitizeFileName(name) {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(-80);
+}
+
+async function uploadPhotos(files) {
+  if (!hasSupabase) {
+    showToast("Photo cloud needs Supabase config.");
+    return;
+  }
+
+  const imageFiles = [...files].filter((file) => file.type.startsWith("image/"));
+  if (!imageFiles.length) return;
+
+  showToast(`Uploading ${imageFiles.length} photo${imageFiles.length === 1 ? "" : "s"}...`);
+  for (const file of imageFiles) {
+    const fileName = `${Date.now()}-${clientId.slice(0, 8)}-${sanitizeFileName(file.name) || "photo.jpg"}`;
+    await storageFetch(`object/${photoBucket}/${encodeURIComponent(fileName)}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": file.type || "application/octet-stream",
+        "x-upsert": "false",
+      },
+      body: file,
+    });
+  }
+  await refreshPhotos({ quiet: true });
+  showToast("Photos uploaded.");
 }
 
 async function claimTraveler(personId) {
@@ -331,6 +424,7 @@ function render() {
   renderDayFilter();
   renderEvents();
   renderPeople();
+  renderPhotos();
   renderNextEvent();
 }
 
@@ -465,6 +559,29 @@ function renderPeople() {
     .join("");
 }
 
+function renderPhotos() {
+  if (!photoGrid) return;
+  if (!hasSupabase) {
+    photoGrid.innerHTML = `<div class="editor-panel">Photo cloud will appear after Supabase is connected.</div>`;
+    return;
+  }
+  if (!state.photos?.length) {
+    photoGrid.innerHTML = `<div class="editor-panel">No trip photos uploaded yet.</div>`;
+    return;
+  }
+
+  photoGrid.innerHTML = state.photos
+    .map(
+      (photo) => `
+        <a class="photo-card" href="${photo.url}" target="_blank" rel="noreferrer">
+          <img src="${photo.url}" alt="Trip photo" loading="lazy" />
+          <span>${escapeHtml(photo.name)}</span>
+        </a>
+      `,
+    )
+    .join("");
+}
+
 function renderNextEvent() {
   const now = Date.now();
   const next = sortedEvents().find((event) => new Date(event.startsAt).getTime() >= now);
@@ -563,6 +680,37 @@ function checkAlarms() {
   });
 }
 
+function getReadyNotifications() {
+  try {
+    return JSON.parse(localStorage.getItem(readyNotificationKey)) || [];
+  } catch {
+    return [];
+  }
+}
+
+function saveReadyNotifications(ids) {
+  localStorage.setItem(readyNotificationKey, JSON.stringify([...new Set(ids)]));
+}
+
+function checkReadyNotifications() {
+  const notified = getReadyNotifications();
+  let changed = false;
+  state.events.forEach((event) => {
+    const everyoneReady =
+      state.people.length > 0 && state.people.every((person) => event.checkins[person.id] === "ready");
+    if (everyoneReady && !notified.includes(event.id)) {
+      const message = `Everybody is ready for ${event.title}.`;
+      showToast(message);
+      if (Notification.permission === "granted") {
+        new Notification("Morocco Crew", { body: message });
+      }
+      notified.push(event.id);
+      changed = true;
+    }
+  });
+  if (changed) saveReadyNotifications(notified);
+}
+
 document.querySelectorAll(".tab-button").forEach((button) => {
   button.addEventListener("click", () => switchTab(button.dataset.tab));
 });
@@ -604,6 +752,16 @@ notifyButton.addEventListener("click", async () => {
   }
   const permission = await Notification.requestPermission();
   showToast(permission === "granted" ? "Alarms enabled for this browser." : "Notifications were not enabled.");
+});
+
+photoUpload.addEventListener("change", async (event) => {
+  try {
+    await uploadPhotos(event.target.files);
+  } catch (error) {
+    showToast(error.message);
+  } finally {
+    photoUpload.value = "";
+  }
 });
 
 form.addEventListener("submit", async (event) => {
@@ -690,8 +848,10 @@ document.body.addEventListener("click", async (event) => {
 
 render();
 refreshState();
+refreshPhotos();
 window.setInterval(() => {
   refreshState({ quiet: true });
+  refreshPhotos({ quiet: true });
   renderNextEvent();
   checkAlarms();
 }, 30000);

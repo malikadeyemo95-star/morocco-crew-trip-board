@@ -26,6 +26,10 @@
             <span class="nav-dot nav-dot-ring" aria-hidden="true"></span>
             Travelers
           </button>
+          <button class="tab-button" type="button" data-tab="photos">
+            <span class="nav-dot nav-dot-photo" aria-hidden="true"></span>
+            Photos
+          </button>
           <button class="tab-button" type="button" data-tab="settings">
             <span class="nav-dot nav-dot-split" aria-hidden="true"></span>
             Setup
@@ -55,7 +59,7 @@
             <h2>Know who is ready before every plan</h2>
           </div>
           <div class="topbar-actions">
-            <button class="secondary-button" id="notifyButton" type="button">Enable alarms</button>
+            <button class="secondary-button" id="notifyButton" type="button">Enable notifications</button>
             <button class="primary-button" id="addEventButton" type="button">Add event</button>
           </div>
         </section>
@@ -92,6 +96,20 @@
             </div>
           </div>
           <div class="people-grid" id="peopleGrid"></div>
+        </section>
+
+        <section class="tab-panel" id="photosPanel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Shared cloud</p>
+              <h3>Trip Photos</h3>
+            </div>
+            <label class="upload-button">
+              Upload photos
+              <input id="photoUpload" type="file" accept="image/*" multiple />
+            </label>
+          </div>
+          <div class="photo-grid" id="photoGrid"></div>
         </section>
 
         <section class="tab-panel" id="settingsPanel">
@@ -140,7 +158,7 @@
     <script>
       window.TRIP_CONFIG = window.TRIP_CONFIG || {};
     </script>
-    <script src="config.js?v=20260514-lock-names"></script>
-    <script src="app.js?v=20260514-lock-names"></script>
+    <script src="config.js?v=20260514-photos-ready"></script>
+    <script src="app.js?v=20260514-photos-ready"></script>
   </body>
 </html>

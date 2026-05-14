@@ -179,6 +179,10 @@ h3 {
   background: linear-gradient(90deg, var(--gold) 0 50%, var(--mint) 50%);
 }
 
+.nav-dot-photo {
+  background: linear-gradient(135deg, var(--rose), var(--gold));
+}
+
 .trip-card {
   padding: 1rem;
   background:
@@ -544,20 +548,40 @@ textarea {
 }
 
 .people-grid,
-.setup-grid {
+.setup-grid,
+.photo-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
   gap: 0.85rem;
 }
 
+.photo-grid {
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+}
+
 .person-card,
-.editor-panel {
+.editor-panel,
+.photo-card {
   padding: 1rem;
   background:
     linear-gradient(180deg, rgba(255, 252, 245, 0.96), rgba(255, 247, 232, 0.92));
   border: 1px solid var(--line);
   border-radius: 8px;
   box-shadow: 0 8px 30px rgba(67, 43, 29, 0.08);
+}
+
+.person-card {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.person-card strong {
+  overflow-wrap: anywhere;
+}
+
+.person-card span {
+  color: var(--muted);
+  font-weight: 850;
 }
 
 .person-card label,
@@ -577,6 +601,48 @@ textarea {
 
 .editor-panel h4 {
   margin-bottom: 0;
+}
+
+.upload-button {
+  display: inline-flex;
+  min-height: 2.6rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.65rem 1rem;
+  color: #fff;
+  background: linear-gradient(135deg, var(--blue), var(--mint));
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 850;
+}
+
+.upload-button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.photo-card {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.55rem;
+}
+
+.photo-card img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #f3eadc;
+}
+
+.photo-card span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
 }
 
 .toast {
@@ -611,7 +677,7 @@ textarea {
   }
 
   .tabs {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
   }
 
   .tab-button {
