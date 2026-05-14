@@ -1,4 +1,3 @@
-const itineraryVersion = "morocco-pdf-v2";
 const clientIdKey = "moroccoCrewClientId";
 
 const statusOptions = [
@@ -9,141 +8,50 @@ const statusOptions = [
   { value: "done", label: "Done" },
 ];
 
-const sampleEvents = [
-  {
-    title: "Arrival in Marrakech",
-    location: "Marrakech",
-    startsAt: "2026-08-16T19:00",
-    notes: "Arrival day. Eat out or find a supermarket to buy foodstuffs to cook dinner.",
-    alarmOffset: 60,
-  },
-  {
-    title: "Brunch",
-    location: "Marrakech",
-    startsAt: "2026-08-17T11:00",
-    notes: "Start the first full day together before heading into the city.",
-    alarmOffset: 45,
-  },
-  {
-    title: "Pottery class and souks walk",
-    location: "Marrakech city",
-    startsAt: "2026-08-17T14:00",
-    notes: "Pottery class. Since you might be in the city, you can also walk around the souks.",
-    alarmOffset: 45,
-  },
-  {
-    title: "Dinner at Safran by Koya",
-    location: "Safran by Koya",
-    startsAt: "2026-08-17T21:00",
-    notes: "Reserved for 21:00. About 11-13 minutes by car.",
-    alarmOffset: 60,
-  },
-  {
-    title: "Quad riding and camel riding",
-    location: "Marrakech",
-    startsAt: "2026-08-18T10:00",
-    notes: "Adventure morning with quad riding and camel riding.",
-    alarmOffset: 60,
-  },
-  {
-    title: "Pool day at home",
-    location: "Apartment",
-    startsAt: "2026-08-18T15:00",
-    notes: "Relaxed pool time at home before dinner.",
-    alarmOffset: 30,
-  },
-  {
-    title: "Dinner at Buddah Bar",
-    location: "Buddah Bar",
-    startsAt: "2026-08-18T21:30",
-    notes: "Dinner at 21:30. About 11-13 minutes by car from the apartment.",
-    alarmOffset: 60,
-  },
-  {
-    title: "Day trip to Casablanca",
-    location: "Casablanca",
-    startsAt: "2026-08-19T09:00",
-    notes: "Day trip from Marrakech to Casablanca.",
-    alarmOffset: 90,
-  },
-  {
-    title: "Morocco Mall",
-    location: "Casablanca",
-    startsAt: "2026-08-19T13:00",
-    notes: "Visit Morocco Mall, noted as the biggest mall in Africa.",
-    alarmOffset: 45,
-  },
-  {
-    title: "Go karting",
-    location: "Casablanca",
-    startsAt: "2026-08-19T17:00",
-    notes: "Go karting after the mall stop.",
-    alarmOffset: 45,
-  },
-  {
-    title: "Medina and souk market",
-    location: "Marrakech Medina",
-    startsAt: "2026-08-20T11:00",
-    notes: "Go to the Medina and souk market.",
-    alarmOffset: 45,
-  },
-  {
-    title: "Bracelet making",
-    location: "Marrakech",
-    startsAt: "2026-08-20T14:00",
-    notes: "Bracelet making activity.",
-    alarmOffset: 30,
-  },
-  {
-    title: "Perfume making",
-    location: "Marrakech",
-    startsAt: "2026-08-20T16:00",
-    notes: "Perfume making activity.",
-    alarmOffset: 30,
-  },
-  {
-    title: "Dinner at Nommos Marrakech",
-    location: "Nommos Marrakech",
-    startsAt: "2026-08-20T20:30",
-    notes: "Could not reserve yet. About 18 minutes by car.",
-    alarmOffset: 60,
-  },
-  {
-    title: "Pool and game day",
-    location: "Apartment",
-    startsAt: "2026-08-21T13:00",
-    notes: "Pool and game day at home.",
-    alarmOffset: 30,
-  },
-  {
-    title: "Club night",
-    location: "Theatro or Club 555",
-    startsAt: "2026-08-21T23:30",
-    notes: "Club Theatro or Club 555.",
-    alarmOffset: 90,
-  },
-  {
-    title: "Chill day before leaving",
-    location: "Apartment",
-    startsAt: "2026-08-22T11:00",
-    notes: "Chill day at home until leaving, if late checkout is possible.",
-    alarmOffset: 60,
-  },
+const defaultPeople = [
+  { id: "traveler-1", name: "Traveler 1", sort_order: 1 },
+  { id: "traveler-2", name: "Traveler 2", sort_order: 2 },
+  { id: "traveler-3", name: "Traveler 3", sort_order: 3 },
+  { id: "traveler-4", name: "Traveler 4", sort_order: 4 },
+  { id: "traveler-5", name: "Traveler 5", sort_order: 5 },
+  { id: "traveler-6", name: "Traveler 6", sort_order: 6 },
+  { id: "traveler-7", name: "Traveler 7", sort_order: 7 },
 ];
 
-const defaultPeople = [
-  "Traveler 1",
-  "Traveler 2",
-  "Traveler 3",
-  "Traveler 4",
-  "Traveler 5",
-  "Traveler 6",
-  "Traveler 7",
-].map((name) => ({ id: crypto.randomUUID(), name }));
+const defaultEvents = [
+  ["arrival-marrakech", "Arrival in Marrakech", "Marrakech", "2026-08-16T19:00", "Arrival day. Eat out or find a supermarket to buy foodstuffs to cook dinner.", 60],
+  ["brunch", "Brunch", "Marrakech", "2026-08-17T11:00", "Start the first full day together before heading into the city.", 45],
+  ["pottery-souks", "Pottery class and souks walk", "Marrakech city", "2026-08-17T14:00", "Pottery class. Since you might be in the city, you can also walk around the souks.", 45],
+  ["safran-koya", "Dinner at Safran by Koya", "Safran by Koya", "2026-08-17T21:00", "Reserved for 21:00. About 11-13 minutes by car.", 60],
+  ["quad-camel", "Quad riding and camel riding", "Marrakech", "2026-08-18T10:00", "Adventure morning with quad riding and camel riding.", 60],
+  ["pool-day", "Pool day at home", "Apartment", "2026-08-18T15:00", "Relaxed pool time at home before dinner.", 30],
+  ["buddah-bar", "Dinner at Buddah Bar", "Buddah Bar", "2026-08-18T21:30", "Dinner at 21:30. About 11-13 minutes by car from the apartment.", 60],
+  ["casablanca-trip", "Day trip to Casablanca", "Casablanca", "2026-08-19T09:00", "Day trip from Marrakech to Casablanca.", 90],
+  ["morocco-mall", "Morocco Mall", "Casablanca", "2026-08-19T13:00", "Visit Morocco Mall, noted as the biggest mall in Africa.", 45],
+  ["go-karting", "Go karting", "Casablanca", "2026-08-19T17:00", "Go karting after the mall stop.", 45],
+  ["medina-souk", "Medina and souk market", "Marrakech Medina", "2026-08-20T11:00", "Go to the Medina and souk market.", 45],
+  ["bracelet-making", "Bracelet making", "Marrakech", "2026-08-20T14:00", "Bracelet making activity.", 30],
+  ["perfume-making", "Perfume making", "Marrakech", "2026-08-20T16:00", "Perfume making activity.", 30],
+  ["nommos", "Dinner at Nommos Marrakech", "Nommos Marrakech", "2026-08-20T20:30", "Could not reserve yet. About 18 minutes by car.", 60],
+  ["pool-games", "Pool and game day", "Apartment", "2026-08-21T13:00", "Pool and game day at home.", 30],
+  ["club-night", "Club night", "Theatro or Club 555", "2026-08-21T23:30", "Club Theatro or Club 555.", 90],
+  ["chill-day", "Chill day before leaving", "Apartment", "2026-08-22T11:00", "Chill day at home until leaving, if late checkout is possible.", 60],
+].map(([id, title, location, startsAt, notes, alarmOffset]) => ({
+  id,
+  title,
+  location,
+  startsAt,
+  notes,
+  alarmOffset,
+  alarmed: false,
+  checkins: Object.fromEntries(defaultPeople.map((person) => [person.id, "not-ready"])),
+}));
 
+const config = window.TRIP_CONFIG || {};
+const hasSupabase = Boolean(config.supabaseUrl && config.supabaseAnonKey);
+const clientId = getClientId();
 let state = createDefaultState();
 let editingEventId = null;
-const clientId = getClientId();
 
 const panels = {
   schedule: document.querySelector("#schedulePanel"),
@@ -171,61 +79,259 @@ function getClientId() {
 }
 
 function createDefaultState() {
-  const people = defaultPeople;
-  const events = sampleEvents.map((event) => ({
-    ...event,
-    id: crypto.randomUUID(),
-    checkins: Object.fromEntries(people.map((person) => [person.id, "not-ready"])),
-    alarmed: false,
-  }));
-
-  return { version: itineraryVersion, activePersonId: "", identityLocked: false, people, events, reservations: {} };
+  return {
+    version: "supabase-ready-v1",
+    activePersonId: "",
+    identityLocked: false,
+    people: defaultPeople.map(({ id, name }) => ({ id, name })),
+    events: defaultEvents.map((event) => ({ ...event, checkins: { ...event.checkins } })),
+    reservations: {},
+  };
 }
 
-async function apiRequest(path, body) {
-  const isGet = path === "/api/state" && body === undefined;
-  const response = await fetch(path, {
-    method: isGet ? "GET" : "POST",
+function supabaseHeaders(prefer) {
+  return {
+    apikey: config.supabaseAnonKey,
+    Authorization: `Bearer ${config.supabaseAnonKey}`,
+    "Content-Type": "application/json",
+    ...(prefer ? { Prefer: prefer } : {}),
+  };
+}
+
+async function supabaseFetch(path, options = {}) {
+  const response = await fetch(`${config.supabaseUrl}/rest/v1/${path}`, {
+    ...options,
     headers: {
-      "Content-Type": "application/json",
-      "X-Client-Id": clientId,
+      ...supabaseHeaders(options.prefer),
+      ...(options.headers || {}),
     },
-    body: isGet ? undefined : JSON.stringify({ ...(body || {}), clientId }),
   });
-  const payload = await response.json();
+
   if (!response.ok) {
-    throw new Error(payload.error || "Request failed.");
+    const text = await response.text();
+    throw new Error(text || "Supabase request failed.");
   }
-  state = payload;
-  syncPeopleToEvents();
-  render();
-  return payload;
+
+  if (response.status === 204) return null;
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
 }
 
 async function refreshState({ quiet = false } = {}) {
+  if (!hasSupabase) {
+    if (!quiet) showToast("Add Supabase config to enable shared mode.");
+    render();
+    return;
+  }
+
   try {
-    await apiRequest("/api/state");
+    const [people, events, checkins, reservations] = await Promise.all([
+      supabaseFetch("people?select=*&order=sort_order.asc"),
+      supabaseFetch("events?select=*&order=starts_at.asc"),
+      supabaseFetch("checkins?select=*"),
+      supabaseFetch("reservations?select=*"),
+    ]);
+
+    const checkinMap = {};
+    checkins.forEach((row) => {
+      checkinMap[row.event_id] ||= {};
+      checkinMap[row.event_id][row.person_id] = row.status;
+    });
+
+    state.people = people.map((person) => ({ id: person.id, name: person.name }));
+    state.events = events.map((event) => ({
+      id: event.id,
+      title: event.title,
+      location: event.location,
+      startsAt: event.starts_at,
+      notes: event.notes,
+      alarmOffset: event.alarm_offset,
+      alarmed: event.alarmed,
+      checkins: {
+        ...Object.fromEntries(state.people.map((person) => [person.id, "not-ready"])),
+        ...(checkinMap[event.id] || {}),
+      },
+    }));
+    state.reservations = Object.fromEntries(reservations.map((row) => [row.person_id, row.client_id]));
+    state.activePersonId = Object.entries(state.reservations).find(([, owner]) => owner === clientId)?.[0] || "";
+    state.identityLocked = Boolean(state.activePersonId);
+    render();
   } catch (error) {
-    if (!quiet) showToast("Shared trip server is not reachable.");
+    if (!quiet) showToast("Shared database is not reachable.");
   }
 }
 
-async function pushStateUpdate() {
-  await apiRequest("/api/update", {
-    people: state.people,
-    events: state.events,
+async function claimTraveler(personId) {
+  if (!hasSupabase) {
+    state.activePersonId = personId;
+    state.identityLocked = true;
+    render();
+    return;
+  }
+
+  try {
+    await supabaseFetch("reservations", {
+      method: "POST",
+      prefer: "return=minimal",
+      body: JSON.stringify({ person_id: personId, client_id: clientId }),
+    });
+  } catch {
+    throw new Error(`${state.people.find((person) => person.id === personId)?.name || "That traveler"} is already taken.`);
+  }
+
+  await refreshState({ quiet: true });
+}
+
+async function releaseTraveler() {
+  if (!hasSupabase) {
+    state.activePersonId = "";
+    state.identityLocked = false;
+    render();
+    return;
+  }
+
+  await supabaseFetch(`reservations?client_id=eq.${encodeURIComponent(clientId)}`, {
+    method: "DELETE",
+    prefer: "return=minimal",
   });
+  await refreshState({ quiet: true });
+}
+
+async function updateCheckin(eventId, personId, status) {
+  if (!hasSupabase) {
+    const event = state.events.find((item) => item.id === eventId);
+    event.checkins[personId] = status;
+    render();
+    return;
+  }
+
+  await supabaseFetch("checkins", {
+    method: "POST",
+    prefer: "resolution=merge-duplicates,return=minimal",
+    body: JSON.stringify({ event_id: eventId, person_id: personId, status }),
+  });
+  await refreshState({ quiet: true });
+}
+
+async function pushEvent(event) {
+  if (!hasSupabase) {
+    render();
+    return;
+  }
+
+  await supabaseFetch("events", {
+    method: "POST",
+    prefer: "resolution=merge-duplicates,return=minimal",
+    body: JSON.stringify({
+      id: event.id,
+      title: event.title,
+      location: event.location,
+      starts_at: event.startsAt,
+      notes: event.notes,
+      alarm_offset: event.alarmOffset,
+      alarmed: event.alarmed,
+    }),
+  });
+
+  await supabaseFetch("checkins", {
+    method: "POST",
+    prefer: "resolution=merge-duplicates,return=minimal",
+    body: JSON.stringify(
+      state.people.map((person) => ({
+        event_id: event.id,
+        person_id: person.id,
+        status: event.checkins[person.id] || "not-ready",
+      })),
+    ),
+  });
+  await refreshState({ quiet: true });
+}
+
+async function deleteEvent(eventId) {
+  if (!hasSupabase) {
+    state.events = state.events.filter((event) => event.id !== eventId);
+    render();
+    return;
+  }
+
+  await supabaseFetch(`events?id=eq.${encodeURIComponent(eventId)}`, {
+    method: "DELETE",
+    prefer: "return=minimal",
+  });
+  await refreshState({ quiet: true });
+}
+
+async function updatePerson(personId, name) {
+  if (!hasSupabase) {
+    state.people = state.people.map((person) => (person.id === personId ? { ...person, name } : person));
+    render();
+    return;
+  }
+
+  await supabaseFetch(`people?id=eq.${encodeURIComponent(personId)}`, {
+    method: "PATCH",
+    prefer: "return=minimal",
+    body: JSON.stringify({ name }),
+  });
+  await refreshState({ quiet: true });
+}
+
+async function resetTripData() {
+  if (!hasSupabase) {
+    state = createDefaultState();
+    render();
+    return;
+  }
+
+  await Promise.all([
+    supabaseFetch("reservations?person_id=neq.__none__", { method: "DELETE", prefer: "return=minimal" }),
+    supabaseFetch("checkins?event_id=neq.__none__", { method: "DELETE", prefer: "return=minimal" }),
+    supabaseFetch("events?id=neq.__none__", { method: "DELETE", prefer: "return=minimal" }),
+  ]);
+  await supabaseFetch("people", {
+    method: "POST",
+    prefer: "resolution=merge-duplicates,return=minimal",
+    body: JSON.stringify(defaultPeople),
+  });
+  await supabaseFetch("events", {
+    method: "POST",
+    prefer: "resolution=merge-duplicates,return=minimal",
+    body: JSON.stringify(
+      defaultEvents.map((event) => ({
+        id: event.id,
+        title: event.title,
+        location: event.location,
+        starts_at: event.startsAt,
+        notes: event.notes,
+        alarm_offset: event.alarmOffset,
+        alarmed: event.alarmed,
+      })),
+    ),
+  });
+  await supabaseFetch("checkins", {
+    method: "POST",
+    prefer: "resolution=merge-duplicates,return=minimal",
+    body: JSON.stringify(
+      defaultEvents.flatMap((event) =>
+        defaultPeople.map((person) => ({
+          event_id: event.id,
+          person_id: person.id,
+          status: "not-ready",
+        })),
+      ),
+    ),
+  });
+  await refreshState({ quiet: true });
 }
 
 function formatDateTime(value) {
-  const date = new Date(value);
   return new Intl.DateTimeFormat(undefined, {
     weekday: "short",
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
-  }).format(date);
+  }).format(new Date(value));
 }
 
 function formatDay(value) {
@@ -249,11 +355,7 @@ function render() {
 }
 
 function getActiveTravelerId() {
-  if (state.activePersonId && !state.people.some((person) => person.id === state.activePersonId)) {
-    state.activePersonId = "";
-    state.identityLocked = false;
-  }
-  return state.activePersonId || "";
+  return state.people.some((person) => person.id === state.activePersonId) ? state.activePersonId : "";
 }
 
 function getActiveTravelerName() {
@@ -265,13 +367,11 @@ function renderActiveTraveler() {
   const selected = getActiveTravelerId();
   activeTraveler.innerHTML = [
     `<option value="">Pick your traveler</option>`,
-    ...state.people
-    .map((person, index) => {
-      const label = `${index + 1}. ${person.name}`;
+    ...state.people.map((person, index) => {
       const owner = state.reservations?.[person.id];
       const takenBySomeoneElse = Boolean(owner && owner !== clientId);
-      const takenText = takenBySomeoneElse ? " - taken" : "";
-      return `<option value="${person.id}" ${person.id === selected ? "selected" : ""} ${takenBySomeoneElse ? "disabled" : ""}>${escapeHtml(label + takenText)}</option>`;
+      const label = `${index + 1}. ${person.name}${takenBySomeoneElse ? " - taken" : ""}`;
+      return `<option value="${person.id}" ${person.id === selected ? "selected" : ""} ${takenBySomeoneElse ? "disabled" : ""}>${escapeHtml(label)}</option>`;
     }),
   ].join("");
   activeTraveler.value = selected;
@@ -295,12 +395,9 @@ function renderEvents() {
     (event) => selectedDay === "all" || event.startsAt.startsWith(selectedDay),
   );
 
-  if (!events.length) {
-    eventList.innerHTML = `<div class="editor-panel">No events for this day yet.</div>`;
-    return;
-  }
-
-  eventList.innerHTML = events.map(renderEventCard).join("");
+  eventList.innerHTML = events.length
+    ? events.map(renderEventCard).join("")
+    : `<div class="editor-panel">No events for this day yet.</div>`;
 }
 
 function renderEventCard(event) {
@@ -437,21 +534,6 @@ function switchTab(tab) {
   });
 }
 
-function syncPeopleToEvents() {
-  state.events = state.events.map((event) => {
-    const checkins = { ...event.checkins };
-    state.people.forEach((person) => {
-      checkins[person.id] ||= "not-ready";
-    });
-    Object.keys(checkins).forEach((personId) => {
-      if (!state.people.some((person) => person.id === personId)) {
-        delete checkins[personId];
-      }
-    });
-    return { ...event, checkins };
-  });
-}
-
 function editEvent(eventId) {
   const event = state.events.find((item) => item.id === eventId);
   if (!event) return;
@@ -487,13 +569,11 @@ function playAlarmSound() {
 
 function checkAlarms() {
   const now = Date.now();
-  let changed = false;
   state.events.forEach((event) => {
     const alarmAt = new Date(event.startsAt).getTime() - event.alarmOffset * 60000;
     const eventAt = new Date(event.startsAt).getTime();
     if (!event.alarmed && now >= alarmAt && now <= eventAt + 60000) {
       event.alarmed = true;
-      changed = true;
       const message = `${event.title} starts in ${event.alarmOffset} minutes.`;
       showToast(message);
       playAlarmSound();
@@ -502,7 +582,6 @@ function checkAlarms() {
       }
     }
   });
-  if (changed) pushStateUpdate().catch((error) => showToast(error.message));
 }
 
 document.querySelectorAll(".tab-button").forEach((button) => {
@@ -520,11 +599,9 @@ document.querySelector("#cancelEditButton").addEventListener("click", clearForm)
 dayFilter.addEventListener("change", renderEvents);
 
 activeTraveler.addEventListener("change", async (event) => {
-  if (!event.target.value) {
-    return;
-  }
+  if (!event.target.value) return;
   try {
-    await apiRequest("/api/claim", { personId: event.target.value });
+    await claimTraveler(event.target.value);
     showToast(`This device is locked to ${getActiveTravelerName()}.`);
   } catch (error) {
     await refreshState({ quiet: true });
@@ -534,7 +611,7 @@ activeTraveler.addEventListener("change", async (event) => {
 
 resetIdentityButton.addEventListener("click", async () => {
   try {
-    await apiRequest("/api/release");
+    await releaseTraveler();
     showToast("Pick the correct traveler for this device.");
   } catch (error) {
     showToast(error.message);
@@ -550,41 +627,42 @@ notifyButton.addEventListener("click", async () => {
   showToast(permission === "granted" ? "Alarms enabled for this browser." : "Notifications were not enabled.");
 });
 
-form.addEventListener("submit", (event) => {
+form.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const data = {
+  const eventData = {
+    id: editingEventId || crypto.randomUUID(),
     title: document.querySelector("#eventTitle").value.trim(),
     location: document.querySelector("#eventLocation").value.trim(),
     startsAt: document.querySelector("#eventDateTime").value,
     notes: document.querySelector("#eventNotes").value.trim(),
+    alarmOffset: editingEventId
+      ? state.events.find((item) => item.id === editingEventId)?.alarmOffset || 30
+      : 30,
+    alarmed: false,
+    checkins: editingEventId
+      ? state.events.find((item) => item.id === editingEventId)?.checkins || {}
+      : Object.fromEntries(state.people.map((person) => [person.id, "not-ready"])),
   };
 
-  if (editingEventId) {
-    state.events = state.events.map((item) =>
-      item.id === editingEventId ? { ...item, ...data, alarmed: false } : item,
-    );
-    showToast("Event updated.");
-  } else {
-    state.events.push({
-      id: crypto.randomUUID(),
-      ...data,
-      alarmOffset: 30,
-      checkins: Object.fromEntries(state.people.map((person) => [person.id, "not-ready"])),
-      alarmed: false,
-    });
-    showToast("Event added.");
-  }
+  state.events = editingEventId
+    ? state.events.map((item) => (item.id === editingEventId ? eventData : item))
+    : [...state.events, eventData];
 
   clearForm();
   switchTab("schedule");
-  pushStateUpdate().catch((error) => showToast(error.message));
+  try {
+    await pushEvent(eventData);
+    showToast(editingEventId ? "Event updated." : "Event added.");
+  } catch (error) {
+    showToast(error.message);
+  }
 });
 
 document.querySelector("#resetButton").addEventListener("click", async () => {
   clearForm();
   try {
-    await apiRequest("/api/reset");
-    showToast("Sample itinerary restored.");
+    await resetTripData();
+    showToast("Trip data restored.");
   } catch (error) {
     showToast(error.message);
   }
@@ -600,11 +678,7 @@ document.body.addEventListener("change", async (event) => {
       return;
     }
     try {
-      await apiRequest("/api/checkin", {
-        eventId: target.dataset.eventId,
-        personId: target.dataset.personId,
-        status: target.value,
-      });
+      await updateCheckin(target.dataset.eventId, target.dataset.personId, target.value);
     } catch (error) {
       await refreshState({ quiet: true });
       showToast(error.message);
@@ -614,18 +688,16 @@ document.body.addEventListener("change", async (event) => {
     const tripEvent = state.events.find((item) => item.id === target.dataset.eventId);
     tripEvent.alarmOffset = Number(target.value);
     tripEvent.alarmed = false;
-    pushStateUpdate().catch((error) => showToast(error.message));
+    await pushEvent(tripEvent).catch((error) => showToast(error.message));
   }
   if (action === "rename") {
-    state.people = state.people.map((person) =>
-      person.id === target.dataset.personId ? { ...person, name: target.value.trim() || "Traveler" } : person,
+    await updatePerson(target.dataset.personId, target.value.trim() || "Traveler").catch((error) =>
+      showToast(error.message),
     );
-    syncPeopleToEvents();
-    pushStateUpdate().catch((error) => showToast(error.message));
   }
 });
 
-document.body.addEventListener("click", (event) => {
+document.body.addEventListener("click", async (event) => {
   const target = event.target.closest("button");
   if (!target) return;
   const action = target.dataset.action;
@@ -633,14 +705,16 @@ document.body.addEventListener("click", (event) => {
     editEvent(target.dataset.eventId);
   }
   if (action === "delete") {
-    state.events = state.events.filter((item) => item.id !== target.dataset.eventId);
-    pushStateUpdate()
-      .then(() => showToast("Event deleted."))
-      .catch((error) => showToast(error.message));
+    try {
+      await deleteEvent(target.dataset.eventId);
+      showToast("Event deleted.");
+    } catch (error) {
+      showToast(error.message);
+    }
   }
 });
 
-syncPeopleToEvents();
+render();
 refreshState();
 window.setInterval(() => {
   refreshState({ quiet: true });
