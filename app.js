@@ -261,21 +261,6 @@ async function deleteEvent(eventId) {
   await refreshState({ quiet: true });
 }
 
-async function updatePerson(personId, name) {
-  if (!hasSupabase) {
-    state.people = state.people.map((person) => (person.id === personId ? { ...person, name } : person));
-    render();
-    return;
-  }
-
-  await supabaseFetch(`people?id=eq.${encodeURIComponent(personId)}`, {
-    method: "PATCH",
-    prefer: "return=minimal",
-    body: JSON.stringify({ name }),
-  });
-  await refreshState({ quiet: true });
-}
-
 async function resetTripData() {
   if (!hasSupabase) {
     state = createDefaultState();
@@ -288,11 +273,6 @@ async function resetTripData() {
     supabaseFetch("checkins?event_id=neq.__none__", { method: "DELETE", prefer: "return=minimal" }),
     supabaseFetch("events?id=neq.__none__", { method: "DELETE", prefer: "return=minimal" }),
   ]);
-  await supabaseFetch("people", {
-    method: "POST",
-    prefer: "resolution=merge-duplicates,return=minimal",
-    body: JSON.stringify(defaultPeople),
-  });
   await supabaseFetch("events", {
     method: "POST",
     prefer: "resolution=merge-duplicates,return=minimal",
@@ -476,10 +456,9 @@ function renderPeople() {
     .map(
       (person, index) => `
         <div class="person-card">
-          <label>
-            Traveler ${index + 1}
-            <input value="${escapeAttribute(person.name)}" data-action="rename" data-person-id="${person.id}" />
-          </label>
+          <p class="eyebrow">Traveler ${index + 1}</p>
+          <strong>${escapeHtml(person.name)}</strong>
+          <span>${state.reservations?.[person.id] ? "Claimed" : "Open"}</span>
         </div>
       `,
     )
@@ -689,11 +668,6 @@ document.body.addEventListener("change", async (event) => {
     tripEvent.alarmOffset = Number(target.value);
     tripEvent.alarmed = false;
     await pushEvent(tripEvent).catch((error) => showToast(error.message));
-  }
-  if (action === "rename") {
-    await updatePerson(target.dataset.personId, target.value.trim() || "Traveler").catch((error) =>
-      showToast(error.message),
-    );
   }
 });
 

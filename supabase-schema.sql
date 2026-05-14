@@ -42,7 +42,6 @@ drop policy if exists "public read reservations" on reservations;
 drop policy if exists "public write reservations" on reservations;
 
 create policy "public read people" on people for select using (true);
-create policy "public write people" on people for all using (true) with check (true);
 create policy "public read events" on events for select using (true);
 create policy "public write events" on events for all using (true) with check (true);
 create policy "public read checkins" on checkins for select using (true);
