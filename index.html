@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Morocco Crew Trip Board</title>
-    <link rel="stylesheet" href="styles.css?v=20260514-day-smart-reminders" />
+    <link rel="stylesheet" href="styles.css?v=20260514-expenses-compact-status" />
   </head>
   <body>
     <div class="app-shell">
@@ -32,7 +32,7 @@
           </button>
           <button class="tab-button" type="button" data-tab="settings">
             <span class="nav-dot nav-dot-split" aria-hidden="true"></span>
-            Setup
+            Expenses
           </button>
         </nav>
 
@@ -115,40 +115,95 @@
         <section class="tab-panel" id="settingsPanel">
           <div class="section-heading">
             <div>
-              <p class="eyebrow">Import</p>
-              <h3>Quick Setup</h3>
+              <p class="eyebrow">Split costs</p>
+              <h3>Expense Splitter</h3>
             </div>
           </div>
-          <div class="setup-grid">
-            <form class="editor-panel" id="eventForm">
-              <h4 id="formTitle">Add Event</h4>
-              <label>
-                Event name
-                <input id="eventTitle" required placeholder="Dinner in Marrakech" />
-              </label>
-              <label>
-                Location
-                <input id="eventLocation" placeholder="Medina, Marrakech" />
-              </label>
-              <label>
-                Date and time
-                <input id="eventDateTime" type="datetime-local" required />
-              </label>
-              <label>
-                Notes
-                <textarea id="eventNotes" rows="4" placeholder="Dress code, pickup point, tickets..."></textarea>
-              </label>
-              <div class="form-actions">
-                <button class="secondary-button" id="cancelEditButton" type="button">Cancel</button>
-                <button class="primary-button" type="submit">Save event</button>
+          <div class="expense-shell">
+            <section class="expense-overview" id="expenseOverview" aria-label="Expense overview"></section>
+            <section class="expense-card expense-form-card">
+              <div class="expense-card-heading">
+                <div>
+                  <p class="eyebrow">Add shared cost</p>
+                  <h4>New expense</h4>
+                </div>
               </div>
-            </form>
-
-            <div class="editor-panel">
-              <h4>Reset Demo Data</h4>
-              <button class="danger-button" id="resetButton" type="button">Reset sample itinerary</button>
-            </div>
+              <form class="expense-form" id="expenseForm">
+                <label>
+                  Description
+                  <input id="expenseDescription" required placeholder="Taxi to dinner" />
+                </label>
+                <label>
+                  Amount
+                  <input id="expenseAmount" required inputmode="decimal" pattern="[0-9]+([.,][0-9]{1,2})?" placeholder="60" />
+                </label>
+                <label>
+                  Paid by
+                  <select id="expensePaidBy" required></select>
+                </label>
+                <label>
+                  Date
+                  <input id="expenseDate" type="date" />
+                </label>
+                <fieldset class="split-fieldset">
+                  <legend>Split between</legend>
+                  <div class="split-options" id="expenseSplitOptions"></div>
+                </fieldset>
+                <button class="primary-button" type="submit">Add expense</button>
+              </form>
+            </section>
+            <section class="expense-card" aria-label="Settlement suggestions">
+              <div class="expense-card-heading">
+                <div>
+                  <p class="eyebrow">Settle up</p>
+                  <h4>Who pays who</h4>
+                </div>
+              </div>
+              <div class="settlement-list" id="settlementList"></div>
+            </section>
+            <section class="expense-card" aria-label="Expense list">
+              <div class="expense-card-heading">
+                <div>
+                  <p class="eyebrow">History</p>
+                  <h4>Shared expenses</h4>
+                </div>
+              </div>
+              <div class="expense-list" id="expenseList"></div>
+            </section>
           </div>
+          <details class="trip-setup-details" id="tripSetupDetails">
+            <summary>Trip setup</summary>
+            <div class="setup-grid">
+              <form class="editor-panel" id="eventForm">
+                <h4 id="formTitle">Add Event</h4>
+                <label>
+                  Event name
+                  <input id="eventTitle" required placeholder="Dinner in Marrakech" />
+                </label>
+                <label>
+                  Location
+                  <input id="eventLocation" placeholder="Medina, Marrakech" />
+                </label>
+                <label>
+                  Date and time
+                  <input id="eventDateTime" type="datetime-local" required />
+                </label>
+                <label>
+                  Notes
+                  <textarea id="eventNotes" rows="4" placeholder="Dress code, pickup point, tickets..."></textarea>
+                </label>
+                <div class="form-actions">
+                  <button class="secondary-button" id="cancelEditButton" type="button">Cancel</button>
+                  <button class="primary-button" type="submit">Save event</button>
+                </div>
+              </form>
+
+              <div class="editor-panel">
+                <h4>Reset Demo Data</h4>
+                <button class="danger-button" id="resetButton" type="button">Reset sample itinerary</button>
+              </div>
+            </div>
+          </details>
         </section>
       </main>
     </div>
@@ -168,7 +223,7 @@
       </button>
       <button class="tab-button" type="button" data-tab="settings">
         <span class="nav-dot nav-dot-split" aria-hidden="true"></span>
-        Setup
+        Expenses
       </button>
     </nav>
 
@@ -190,7 +245,7 @@
       window.TRIP_CONFIG = window.TRIP_CONFIG || {};
     </script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="config.js?v=20260514-day-smart-reminders"></script>
-    <script src="app.js?v=20260514-day-smart-reminders"></script>
+    <script src="config.js?v=20260514-expenses-compact-status"></script>
+    <script src="app.js?v=20260514-expenses-compact-status"></script>
   </body>
 </html>

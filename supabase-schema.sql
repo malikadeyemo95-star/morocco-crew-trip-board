@@ -27,10 +27,21 @@ create table if not exists reservations (
   claimed_at timestamptz not null default now()
 );
 
+create table if not exists expenses (
+  id text primary key,
+  description text not null,
+  amount numeric(10, 2) not null check (amount > 0),
+  paid_by text not null references people(id) on delete restrict,
+  split_between jsonb not null default '[]'::jsonb,
+  spent_at date not null default current_date,
+  created_at timestamptz not null default now()
+);
+
 alter table people enable row level security;
 alter table events enable row level security;
 alter table checkins enable row level security;
 alter table reservations enable row level security;
+alter table expenses enable row level security;
 
 drop policy if exists "public read people" on people;
 drop policy if exists "public write people" on people;
@@ -40,6 +51,8 @@ drop policy if exists "public read checkins" on checkins;
 drop policy if exists "public write checkins" on checkins;
 drop policy if exists "public read reservations" on reservations;
 drop policy if exists "public write reservations" on reservations;
+drop policy if exists "public read expenses" on expenses;
+drop policy if exists "public write expenses" on expenses;
 
 create policy "public read people" on people for select using (true);
 create policy "public read events" on events for select using (true);
@@ -48,6 +61,8 @@ create policy "public read checkins" on checkins for select using (true);
 create policy "public write checkins" on checkins for all using (true) with check (true);
 create policy "public read reservations" on reservations for select using (true);
 create policy "public write reservations" on reservations for all using (true) with check (true);
+create policy "public read expenses" on expenses for select using (true);
+create policy "public write expenses" on expenses for all using (true) with check (true);
 
 insert into people (id, name, sort_order) values
   ('traveler-1', 'Traveler 1', 1),

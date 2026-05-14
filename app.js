@@ -1,6 +1,7 @@
 const clientIdKey = "moroccoCrewClientId";
 const readyNotificationKey = "moroccoReadyNotifications";
 const smartReminderKey = "moroccoSmartReminders";
+const localExpensesKey = "moroccoCrewExpenses";
 const photoBucket = "trip-photos";
 
 const statusOptions = [
@@ -10,6 +11,12 @@ const statusOptions = [
   { value: "on-way", label: "On the way" },
   { value: "done", label: "Done" },
 ];
+
+const currencyFormatter = new Intl.NumberFormat(undefined, {
+  style: "currency",
+  currency: "EUR",
+  maximumFractionDigits: 2,
+});
 
 const defaultPeople = [
   { id: "traveler-1", name: "Traveler 1", sort_order: 1 },
@@ -64,6 +71,7 @@ let realtimeReconnectTimer = null;
 let deletePhotoName = "";
 let pendingPhotoDeleteName = "";
 let selectedDay = "";
+let expensesShared = true;
 
 const panels = {
   schedule: document.querySelector("#schedulePanel"),
@@ -86,6 +94,16 @@ const resetIdentityButton = document.querySelector("#resetIdentityButton");
 const photoConfirmBackdrop = document.querySelector("#photoConfirmBackdrop");
 const cancelPhotoDeleteButton = document.querySelector("#cancelPhotoDeleteButton");
 const confirmPhotoDeleteButton = document.querySelector("#confirmPhotoDeleteButton");
+const expenseOverview = document.querySelector("#expenseOverview");
+const expenseForm = document.querySelector("#expenseForm");
+const expenseDescription = document.querySelector("#expenseDescription");
+const expenseAmount = document.querySelector("#expenseAmount");
+const expensePaidBy = document.querySelector("#expensePaidBy");
+const expenseDate = document.querySelector("#expenseDate");
+const expenseSplitOptions = document.querySelector("#expenseSplitOptions");
+const settlementList = document.querySelector("#settlementList");
+const expenseList = document.querySelector("#expenseList");
+const tripSetupDetails = document.querySelector("#tripSetupDetails");
 
 function getClientId() {
   let saved = localStorage.getItem(clientIdKey);
@@ -105,6 +123,7 @@ function createDefaultState() {
     events: defaultEvents.map((event) => ({ ...event, checkins: { ...event.checkins } })),
     reservations: {},
     photos: [],
+    expenses: getLocalExpenses(),
   };
 }
 
@@ -232,6 +251,99 @@ async function refreshPhotos({ quiet = false } = {}) {
   } catch (error) {
     if (!quiet) showToast("Photo cloud is not reachable.");
   }
+}
+
+function getLocalExpenses() {
+  try {
+    return JSON.parse(localStorage.getItem(localExpensesKey)) || [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalExpenses() {
+  localStorage.setItem(localExpensesKey, JSON.stringify(state.expenses || []));
+}
+
+async function refreshExpenses({ quiet = false } = {}) {
+  if (!hasSupabase) {
+    state.expenses = getLocalExpenses();
+    expensesShared = false;
+    renderExpenses();
+    return;
+  }
+
+  try {
+    const rows = await supabaseFetch("expenses?select=*&order=spent_at.desc");
+    state.expenses = rows.map((row) => ({
+      id: row.id,
+      description: row.description,
+      amount: Number(row.amount) || 0,
+      paidBy: row.paid_by,
+      splitBetween: Array.isArray(row.split_between) ? row.split_between : [],
+      spentAt: row.spent_at,
+    }));
+    expensesShared = true;
+    renderExpenses();
+  } catch (error) {
+    state.expenses = getLocalExpenses();
+    expensesShared = false;
+    renderExpenses();
+    if (!quiet) showToast("Expense sharing needs the Supabase expenses table. Local mode is on for now.");
+  }
+}
+
+async function addExpense(expense) {
+  if (!expense.description.trim()) throw new Error("Add a short description.");
+  if (!Number.isFinite(expense.amount) || expense.amount <= 0) throw new Error("Enter a valid amount.");
+  if (!state.people.some((person) => person.id === expense.paidBy)) throw new Error("Choose who paid.");
+  if (!expense.splitBetween.length) throw new Error("Choose who to split with.");
+
+  const nextExpense = {
+    id: crypto.randomUUID(),
+    description: expense.description.trim(),
+    amount: Math.round(expense.amount * 100) / 100,
+    paidBy: expense.paidBy,
+    splitBetween: expense.splitBetween,
+    spentAt: expense.spentAt || new Date().toISOString().slice(0, 10),
+  };
+
+  if (!hasSupabase || !expensesShared) {
+    state.expenses = [nextExpense, ...(state.expenses || [])];
+    saveLocalExpenses();
+    renderExpenses();
+    return;
+  }
+
+  await supabaseFetch("expenses", {
+    method: "POST",
+    prefer: "return=minimal",
+    body: JSON.stringify({
+      id: nextExpense.id,
+      description: nextExpense.description,
+      amount: nextExpense.amount,
+      paid_by: nextExpense.paidBy,
+      split_between: nextExpense.splitBetween,
+      spent_at: nextExpense.spentAt,
+    }),
+  });
+  await refreshExpenses({ quiet: true });
+}
+
+async function deleteExpense(expenseId) {
+  if (!expenseId) return;
+  if (!hasSupabase || !expensesShared) {
+    state.expenses = (state.expenses || []).filter((expense) => expense.id !== expenseId);
+    saveLocalExpenses();
+    renderExpenses();
+    return;
+  }
+
+  await supabaseFetch(`expenses?id=eq.${encodeURIComponent(expenseId)}`, {
+    method: "DELETE",
+    prefer: "return=minimal",
+  });
+  await refreshExpenses({ quiet: true });
 }
 
 function sanitizeFileName(name) {
@@ -500,10 +612,12 @@ function sortedEvents() {
 function render() {
   renderTripState();
   renderPhotos();
+  renderExpenses();
 }
 
 function renderTripState() {
   renderActiveTraveler();
+  renderExpenseControls();
   renderDaySwitcher();
   renderEvents();
   renderPeople();
@@ -590,6 +704,29 @@ function renderEvents() {
     : `<div class="empty-state"><span aria-hidden="true">Plan</span><h4>No activities planned for ${dayLabel} yet.</h4><p>Add a plan when the crew has something locked in.</p></div>`;
 }
 
+function getStatusOption(status) {
+  return statusOptions.find((item) => item.value === status) || statusOptions[0];
+}
+
+function getStatusSummary(event) {
+  return statusOptions
+    .map((option) => {
+      const people = state.people.filter((person) => (event.checkins[person.id] || "not-ready") === option.value);
+      return { ...option, count: people.length, people };
+    })
+    .filter((item) => item.count > 0);
+}
+
+function getInitials(name) {
+  return String(name)
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+}
+
 function renderEventCard(event) {
   const readyCount = state.people.filter((person) => event.checkins[person.id] === "ready").length;
   const doneCount = state.people.filter((person) => event.checkins[person.id] === "done").length;
@@ -624,11 +761,32 @@ function renderEventCard(event) {
       </section>
     `;
 
-  const groupStatuses = state.people
-    .filter((person) => person.id !== activePersonId)
+  const statusSummary = getStatusSummary(event);
+  const summaryChips = statusSummary
+    .map(
+      (item) => `
+        <span class="status-summary-chip status-${item.value}">
+          <strong>${item.count}</strong>
+          ${item.label}
+        </span>
+      `,
+    )
+    .join("");
+  const avatarRow = state.people
     .map((person) => {
       const status = event.checkins[person.id] || "not-ready";
-      const option = statusOptions.find((item) => item.value === status);
+      const option = getStatusOption(status);
+      return `
+        <span class="status-avatar status-${status}" title="${escapeAttribute(`${person.name}: ${option.label}`)}" aria-label="${escapeAttribute(`${person.name}: ${option.label}`)}">
+          ${escapeHtml(getInitials(person.name))}
+        </span>
+      `;
+    })
+    .join("");
+  const groupStatuses = state.people
+    .map((person) => {
+      const status = event.checkins[person.id] || "not-ready";
+      const option = getStatusOption(status);
 
       return `
         <div class="group-status-row status-${status}">
@@ -670,9 +828,14 @@ function renderEventCard(event) {
           <section class="group-status-card" aria-label="Group status">
             <div class="status-section-title">
               <p class="eyebrow">Group status</p>
-              <span>${state.people.length - (activePerson ? 1 : 0)} travelers</span>
+              <span>${readyCount}/${state.people.length} ready</span>
             </div>
-            <div class="group-status-list">${groupStatuses}</div>
+            <div class="status-summary-chips">${summaryChips}</div>
+            <div class="status-avatar-row" aria-label="Traveler status initials">${avatarRow}</div>
+            <details class="group-status-details">
+              <summary>View all travelers</summary>
+              <div class="group-status-list">${groupStatuses}</div>
+            </details>
           </section>
         </div>
       </div>
@@ -723,6 +886,161 @@ function renderPhotos() {
       `,
     )
     .join("");
+}
+
+function renderExpenseControls() {
+  if (!expensePaidBy || !expenseSplitOptions) return;
+  const selectedPayer = expensePaidBy.value || getActiveTravelerId();
+  const checkedValues = [...expenseSplitOptions.querySelectorAll("input:checked")].map((input) => input.value);
+  const hasExistingChoices = expenseSplitOptions.querySelectorAll("input").length > 0;
+  expensePaidBy.innerHTML = [
+    `<option value="">Who paid?</option>`,
+    ...state.people.map((person) => `<option value="${person.id}">${escapeHtml(person.name)}</option>`),
+  ].join("");
+  expensePaidBy.value = state.people.some((person) => person.id === selectedPayer) ? selectedPayer : "";
+
+  expenseSplitOptions.innerHTML = state.people
+    .map(
+      (person) => `
+        <label class="split-option">
+          <input type="checkbox" value="${person.id}" ${!hasExistingChoices || checkedValues.includes(person.id) ? "checked" : ""} />
+          <span>${escapeHtml(person.name)}</span>
+        </label>
+      `,
+    )
+    .join("");
+}
+
+function renderExpenses() {
+  if (!expenseOverview || !settlementList || !expenseList) return;
+  const expenses = state.expenses || [];
+  const activePersonId = getActiveTravelerId();
+  const totals = getExpenseTotals(expenses);
+  const myPaid = activePersonId ? expenses.filter((expense) => expense.paidBy === activePersonId).reduce((sum, expense) => sum + expense.amount, 0) : 0;
+  const myBalance = activePersonId ? totals.balances[activePersonId] || 0 : 0;
+  const myBalanceText = !activePersonId
+    ? "Pick your traveler"
+    : Math.abs(myBalance) < 0.01
+      ? "All settled"
+      : myBalance > 0
+        ? `You are owed ${formatMoney(myBalance)}`
+        : `You owe ${formatMoney(Math.abs(myBalance))}`;
+
+  expenseOverview.innerHTML = `
+    <article class="expense-stat-card">
+      <span>Total spent</span>
+      <strong>${formatMoney(totals.total)}</strong>
+    </article>
+    <article class="expense-stat-card">
+      <span>You paid</span>
+      <strong>${activePersonId ? formatMoney(myPaid) : "--"}</strong>
+    </article>
+    <article class="expense-stat-card ${myBalance > 0 ? "positive" : myBalance < 0 ? "negative" : ""}">
+      <span>Your balance</span>
+      <strong>${myBalanceText}</strong>
+    </article>
+    <article class="expense-stat-card subtle">
+      <span>Mode</span>
+      <strong>${expensesShared ? "Shared" : "Local"}</strong>
+    </article>
+  `;
+
+  const settlements = getSettlements(totals.balances);
+  settlementList.innerHTML = settlements.length
+    ? settlements
+        .map(
+          (settlement) => `
+            <div class="settlement-row">
+              <span>${escapeHtml(getPersonName(settlement.from))}</span>
+              <strong>${formatMoney(settlement.amount)}</strong>
+              <span>${escapeHtml(getPersonName(settlement.to))}</span>
+            </div>
+          `,
+        )
+        .join("")
+    : `<div class="empty-state compact"><span aria-hidden="true">Settle</span><h4>All settled.</h4><p>No one owes anything yet.</p></div>`;
+
+  expenseList.innerHTML = expenses.length
+    ? expenses.map(renderExpenseCard).join("")
+    : `<div class="empty-state compact"><span aria-hidden="true">Split</span><h4>No expenses added yet.</h4><p>Add your first shared cost.</p></div>`;
+}
+
+function renderExpenseCard(expense) {
+  const splitCount = expense.splitBetween.length || 1;
+  const eachOwes = expense.amount / splitCount;
+  const splitNames = expense.splitBetween.map(getPersonName).join(", ");
+  return `
+    <article class="expense-item">
+      <div>
+        <p class="eyebrow">${formatExpenseDate(expense.spentAt)}</p>
+        <h5>${escapeHtml(expense.description)}</h5>
+        <p>${escapeHtml(getPersonName(expense.paidBy))} paid ${formatMoney(expense.amount)}</p>
+        <span>Split between ${escapeHtml(splitNames || "the crew")} · ${formatMoney(eachOwes)} each</span>
+      </div>
+      <div class="expense-item-side">
+        <strong>${formatMoney(expense.amount)}</strong>
+        <button class="icon-button" type="button" data-action="delete-expense" data-expense-id="${escapeAttribute(expense.id)}">Delete</button>
+      </div>
+    </article>
+  `;
+}
+
+function getExpenseTotals(expenses) {
+  const balances = Object.fromEntries(state.people.map((person) => [person.id, 0]));
+  let total = 0;
+  expenses.forEach((expense) => {
+    const amount = Number(expense.amount) || 0;
+    const splitBetween = expense.splitBetween?.length ? expense.splitBetween : state.people.map((person) => person.id);
+    const share = amount / splitBetween.length;
+    total += amount;
+    balances[expense.paidBy] = (balances[expense.paidBy] || 0) + amount;
+    splitBetween.forEach((personId) => {
+      balances[personId] = (balances[personId] || 0) - share;
+    });
+  });
+  return { total, balances };
+}
+
+function getSettlements(balances) {
+  const debtors = Object.entries(balances)
+    .filter(([, amount]) => amount < -0.01)
+    .map(([personId, amount]) => ({ personId, amount: Math.abs(amount) }))
+    .sort((a, b) => b.amount - a.amount);
+  const creditors = Object.entries(balances)
+    .filter(([, amount]) => amount > 0.01)
+    .map(([personId, amount]) => ({ personId, amount }))
+    .sort((a, b) => b.amount - a.amount);
+  const settlements = [];
+  let debtorIndex = 0;
+  let creditorIndex = 0;
+
+  while (debtorIndex < debtors.length && creditorIndex < creditors.length) {
+    const debtor = debtors[debtorIndex];
+    const creditor = creditors[creditorIndex];
+    const amount = Math.min(debtor.amount, creditor.amount);
+    if (amount > 0.01) {
+      settlements.push({ from: debtor.personId, to: creditor.personId, amount });
+    }
+    debtor.amount -= amount;
+    creditor.amount -= amount;
+    if (debtor.amount <= 0.01) debtorIndex += 1;
+    if (creditor.amount <= 0.01) creditorIndex += 1;
+  }
+
+  return settlements;
+}
+
+function getPersonName(personId) {
+  return state.people.find((person) => person.id === personId)?.name || "Unknown traveler";
+}
+
+function formatMoney(amount) {
+  return currencyFormatter.format(Number(amount) || 0);
+}
+
+function formatExpenseDate(value) {
+  if (!value) return "Today";
+  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(`${value}T12:00`));
 }
 
 function renderNextEvent() {
@@ -799,6 +1117,7 @@ function editEvent(eventId) {
   document.querySelector("#eventLocation").value = event.location;
   document.querySelector("#eventDateTime").value = event.startsAt;
   document.querySelector("#eventNotes").value = event.notes;
+  if (tripSetupDetails) tripSetupDetails.open = true;
   switchTab("settings");
 }
 
@@ -934,6 +1253,7 @@ document.querySelectorAll(".tab-button").forEach((button) => {
 
 document.querySelector("#addEventButton").addEventListener("click", () => {
   clearForm();
+  if (tripSetupDetails) tripSetupDetails.open = true;
   switchTab("settings");
   document.querySelector("#eventTitle").focus();
 });
@@ -1054,6 +1374,25 @@ document.querySelector("#resetButton").addEventListener("click", async () => {
   }
 });
 
+expenseForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const splitBetween = [...expenseSplitOptions.querySelectorAll("input:checked")].map((input) => input.value);
+  try {
+    await addExpense({
+      description: expenseDescription.value,
+      amount: Number(expenseAmount.value.replace(",", ".")),
+      paidBy: expensePaidBy.value,
+      splitBetween,
+      spentAt: expenseDate.value || new Date().toISOString().slice(0, 10),
+    });
+    expenseForm.reset();
+    renderExpenseControls();
+    showToast("Expense added.");
+  } catch (error) {
+    showToast(error.message);
+  }
+});
+
 document.body.addEventListener("change", async (event) => {
   const target = event.target;
   const action = target.dataset.action;
@@ -1124,6 +1463,14 @@ document.body.addEventListener("click", async (event) => {
     const photoName = target.dataset.photoName || "";
     openPhotoDeleteConfirm(photoName);
   }
+  if (action === "delete-expense") {
+    try {
+      await deleteExpense(target.dataset.expenseId || "");
+      showToast("Expense deleted.");
+    } catch (error) {
+      showToast(error.message);
+    }
+  }
 });
 
 function scheduleRealtimeReconnect() {
@@ -1167,9 +1514,11 @@ render();
 setupRealtime();
 refreshState();
 refreshPhotos();
+refreshExpenses({ quiet: true });
 window.setInterval(() => {
   refreshState({ quiet: true });
   refreshPhotos({ quiet: true });
+  refreshExpenses({ quiet: true });
   renderNextEvent();
   checkAlarms();
 }, 30000);
