@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Morocco Crew Trip Board</title>
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=20260514-premium-ui" />
   </head>
   <body>
     <div class="app-shell">
@@ -153,13 +153,44 @@
       </main>
     </div>
 
+    <nav class="tabs mobile-tabs" aria-label="Mobile sections">
+      <button class="tab-button active" type="button" data-tab="schedule">
+        <span class="nav-dot" aria-hidden="true"></span>
+        Itinerary
+      </button>
+      <button class="tab-button" type="button" data-tab="people">
+        <span class="nav-dot nav-dot-ring" aria-hidden="true"></span>
+        Travelers
+      </button>
+      <button class="tab-button" type="button" data-tab="photos">
+        <span class="nav-dot nav-dot-photo" aria-hidden="true"></span>
+        Photos
+      </button>
+      <button class="tab-button" type="button" data-tab="settings">
+        <span class="nav-dot nav-dot-split" aria-hidden="true"></span>
+        Setup
+      </button>
+    </nav>
+
+    <div class="confirm-backdrop" id="photoConfirmBackdrop" hidden>
+      <section class="confirm-sheet" role="dialog" aria-modal="true" aria-labelledby="photoConfirmTitle">
+        <p class="eyebrow">Shared gallery</p>
+        <h3 id="photoConfirmTitle">Delete this photo?</h3>
+        <p>This removes the photo from the trip cloud for everyone.</p>
+        <div class="confirm-actions">
+          <button class="secondary-button" id="cancelPhotoDeleteButton" type="button">Keep photo</button>
+          <button class="danger-button" id="confirmPhotoDeleteButton" type="button">Delete photo</button>
+        </div>
+      </section>
+    </div>
+
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
     <script>
       window.TRIP_CONFIG = window.TRIP_CONFIG || {};
     </script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="config.js?v=20260514-download-fix"></script>
-    <script src="app.js?v=20260514-download-fix"></script>
+    <script src="config.js?v=20260514-premium-ui"></script>
+    <script src="app.js?v=20260514-premium-ui"></script>
   </body>
 </html>

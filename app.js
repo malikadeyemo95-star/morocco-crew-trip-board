@@ -62,6 +62,7 @@ let realtimeChannel = null;
 let realtimeReconnectTimer = null;
 let deletePhotoName = "";
 let downloadPhotoName = "";
+let pendingPhotoDeleteName = "";
 
 const panels = {
   schedule: document.querySelector("#schedulePanel"),
@@ -81,6 +82,9 @@ const formTitle = document.querySelector("#formTitle");
 const notifyButton = document.querySelector("#notifyButton");
 const activeTraveler = document.querySelector("#activeTraveler");
 const resetIdentityButton = document.querySelector("#resetIdentityButton");
+const photoConfirmBackdrop = document.querySelector("#photoConfirmBackdrop");
+const cancelPhotoDeleteButton = document.querySelector("#cancelPhotoDeleteButton");
+const confirmPhotoDeleteButton = document.querySelector("#confirmPhotoDeleteButton");
 
 function getClientId() {
   let saved = localStorage.getItem(clientIdKey);
@@ -527,7 +531,7 @@ function renderEvents() {
 
   eventList.innerHTML = events.length
     ? events.map(renderEventCard).join("")
-    : `<div class="editor-panel">No events for this day yet.</div>`;
+    : `<div class="empty-state"><span aria-hidden="true">Plan</span><h4>No events for this day yet.</h4><p>Add a plan when the crew has something locked in.</p></div>`;
 }
 
 function renderEventCard(event) {
@@ -537,7 +541,7 @@ function renderEventCard(event) {
     .map((person) => {
       const status = event.checkins[person.id] || "not-ready";
       const option = statusOptions.find((item) => item.value === status);
-      const className = status === "ready" || status === "done" ? ` ${status}` : "";
+      const className = ` status-${status}`;
       return `<span class="status-pill${className}">${escapeHtml(person.name)}: ${option.label}</span>`;
     })
     .join("");
@@ -553,7 +557,7 @@ function renderEventCard(event) {
         .join("");
 
       return `
-        <label class="checkin-card${isActivePerson ? " active-traveler" : " locked-traveler"}">
+        <label class="checkin-card status-${event.checkins[person.id] || "not-ready"}${isActivePerson ? " active-traveler" : " locked-traveler"}">
           <strong>${escapeHtml(person.name)}</strong>
           <select data-action="checkin" data-event-id="${event.id}" data-person-id="${person.id}" ${isActivePerson ? "" : "disabled"}>
             ${options}
@@ -567,8 +571,8 @@ function renderEventCard(event) {
   return `
     <article class="event-card">
       <div class="event-time">
-        <div>${formatDay(event.startsAt)}</div>
-        <div>${new Date(event.startsAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</div>
+        <span class="event-day">${formatDay(event.startsAt)}</span>
+        <strong>${new Date(event.startsAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</strong>
         <label>
           Alarm
           <select data-action="alarm" data-event-id="${event.id}">
@@ -591,8 +595,8 @@ function renderEventCard(event) {
         </div>
         <p>${escapeHtml(event.notes || "No notes yet.")}</p>
         <div class="ready-summary" aria-label="Readiness summary">
-          <span class="status-pill ready">${readyCount}/${state.people.length} ready</span>
-          <span class="status-pill done">${doneCount}/${state.people.length} done</span>
+          <span class="status-pill status-ready">${readyCount}/${state.people.length} ready</span>
+          <span class="status-pill status-done">${doneCount}/${state.people.length} done</span>
           ${statusPills}
         </div>
         <div class="checkin-grid">${checkins}</div>
@@ -608,7 +612,7 @@ function renderPeople() {
         <div class="person-card">
           <p class="eyebrow">Traveler ${index + 1}</p>
           <strong>${escapeHtml(person.name)}</strong>
-          <span>${state.reservations?.[person.id] ? "Claimed" : "Open"}</span>
+          <span class="${state.reservations?.[person.id] ? "claimed" : "open"}">${state.reservations?.[person.id] ? "Claimed" : "Open"}</span>
         </div>
       `,
     )
@@ -618,11 +622,11 @@ function renderPeople() {
 function renderPhotos() {
   if (!photoGrid) return;
   if (!hasSupabase) {
-    photoGrid.innerHTML = `<div class="editor-panel">Photo cloud will appear after Supabase is connected.</div>`;
+    photoGrid.innerHTML = `<div class="empty-state"><span aria-hidden="true">Cloud</span><h4>Photo cloud is waiting.</h4><p>Connect Supabase to share trip photos here.</p></div>`;
     return;
   }
   if (!state.photos?.length) {
-    photoGrid.innerHTML = `<div class="editor-panel">No trip photos uploaded yet.</div>`;
+    photoGrid.innerHTML = `<div class="empty-state"><span aria-hidden="true">Gallery</span><h4>No trip photos yet.</h4><p>Upload the first memory and everyone can save it.</p></div>`;
     return;
   }
 
@@ -672,6 +676,23 @@ function showToast(message) {
   toast.textContent = message;
   toast.classList.add("show");
   window.setTimeout(() => toast.classList.remove("show"), 2600);
+}
+
+function openPhotoDeleteConfirm(photoName) {
+  pendingPhotoDeleteName = photoName;
+  photoConfirmBackdrop.hidden = false;
+  requestAnimationFrame(() => photoConfirmBackdrop.classList.add("show"));
+  confirmPhotoDeleteButton.focus();
+}
+
+function closePhotoDeleteConfirm() {
+  pendingPhotoDeleteName = "";
+  photoConfirmBackdrop.classList.remove("show");
+  window.setTimeout(() => {
+    if (!photoConfirmBackdrop.classList.contains("show")) {
+      photoConfirmBackdrop.hidden = true;
+    }
+  }, 180);
 }
 
 function escapeHtml(value) {
@@ -830,6 +851,40 @@ photoUpload.addEventListener("change", async (event) => {
   }
 });
 
+cancelPhotoDeleteButton.addEventListener("click", closePhotoDeleteConfirm);
+
+photoConfirmBackdrop.addEventListener("click", (event) => {
+  if (event.target === photoConfirmBackdrop) closePhotoDeleteConfirm();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !photoConfirmBackdrop.hidden) {
+    closePhotoDeleteConfirm();
+  }
+});
+
+confirmPhotoDeleteButton.addEventListener("click", async () => {
+  const photoName = pendingPhotoDeleteName;
+  if (!photoName) return;
+  try {
+    deletePhotoName = photoName;
+    confirmPhotoDeleteButton.disabled = true;
+    confirmPhotoDeleteButton.textContent = "Deleting...";
+    closePhotoDeleteConfirm();
+    renderPhotos();
+    await deletePhoto(photoName);
+    showToast("Photo deleted.");
+    await refreshPhotos({ quiet: true });
+  } catch (error) {
+    showToast(error.message);
+  } finally {
+    deletePhotoName = "";
+    confirmPhotoDeleteButton.disabled = false;
+    confirmPhotoDeleteButton.textContent = "Delete photo";
+    renderPhotos();
+  }
+});
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   const eventData = {
@@ -926,19 +981,7 @@ document.body.addEventListener("click", async (event) => {
   }
   if (action === "delete-photo") {
     const photoName = target.dataset.photoName || "";
-    if (!window.confirm("Delete this photo from the shared gallery?")) return;
-    try {
-      deletePhotoName = photoName;
-      renderPhotos();
-      await deletePhoto(photoName);
-      showToast("Photo deleted.");
-      await refreshPhotos({ quiet: true });
-    } catch (error) {
-      showToast(error.message);
-    } finally {
-      deletePhotoName = "";
-      renderPhotos();
-    }
+    openPhotoDeleteConfirm(photoName);
   }
 });
 
