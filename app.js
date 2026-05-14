@@ -61,6 +61,7 @@ let editingEventId = null;
 let realtimeChannel = null;
 let realtimeReconnectTimer = null;
 let deletePhotoName = "";
+let downloadPhotoName = "";
 
 const panels = {
   schedule: document.querySelector("#schedulePanel"),
@@ -285,6 +286,28 @@ async function deletePhoto(photoName) {
   });
   state.photos = state.photos.filter((photo) => photo.name !== photoName);
   renderPhotos();
+}
+
+async function downloadPhoto(photoName) {
+  const photo = state.photos.find((item) => item.name === photoName);
+  if (!photo || !isSafePhotoName(photoName)) {
+    throw new Error("That photo could not be downloaded safely.");
+  }
+
+  const response = await fetch(photo.url);
+  if (!response.ok) {
+    throw new Error("Could not prepare that photo for download.");
+  }
+
+  const blob = await response.blob();
+  const blobUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = blobUrl;
+  link.download = photo.name;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
 }
 
 async function claimTraveler(personId) {
@@ -612,7 +635,9 @@ function renderPhotos() {
           </a>
           <span>${escapeHtml(photo.name)}</span>
           <div class="photo-actions">
-            <a class="secondary-button photo-action" href="${photo.url}" download="${escapeAttribute(photo.name)}" target="_blank" rel="noreferrer">Download</a>
+            <button class="secondary-button photo-action" type="button" data-action="download-photo" data-photo-name="${escapeAttribute(photo.name)}" ${downloadPhotoName === photo.name ? "disabled" : ""}>
+              ${downloadPhotoName === photo.name ? "Preparing..." : "Download"}
+            </button>
             <button class="danger-button photo-action" type="button" data-action="delete-photo" data-photo-name="${escapeAttribute(photo.name)}" ${deletePhotoName === photo.name ? "disabled" : ""}>
               ${deletePhotoName === photo.name ? "Deleting..." : "Delete"}
             </button>
@@ -883,6 +908,20 @@ document.body.addEventListener("click", async (event) => {
       showToast("Event deleted.");
     } catch (error) {
       showToast(error.message);
+    }
+  }
+  if (action === "download-photo") {
+    const photoName = target.dataset.photoName || "";
+    try {
+      downloadPhotoName = photoName;
+      renderPhotos();
+      await downloadPhoto(photoName);
+      showToast("Photo download started.");
+    } catch (error) {
+      showToast(error.message);
+    } finally {
+      downloadPhotoName = "";
+      renderPhotos();
     }
   }
   if (action === "delete-photo") {
