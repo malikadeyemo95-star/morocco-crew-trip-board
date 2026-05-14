@@ -51,9 +51,16 @@ const defaultEvents = [
 
 const config = window.TRIP_CONFIG || {};
 const hasSupabase = Boolean(config.supabaseUrl && config.supabaseAnonKey);
+const realtimeClient =
+  hasSupabase && window.supabase?.createClient
+    ? window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey)
+    : null;
 const clientId = getClientId();
 let state = createDefaultState();
 let editingEventId = null;
+let realtimeChannel = null;
+let realtimeReconnectTimer = null;
+let deletePhotoName = "";
 
 const panels = {
   schedule: document.querySelector("#schedulePanel"),
@@ -229,6 +236,17 @@ function sanitizeFileName(name) {
     .slice(-80);
 }
 
+function isSafePhotoName(name) {
+  return (
+    typeof name === "string" &&
+    Boolean(name.trim()) &&
+    !name.includes("/") &&
+    !name.includes("\\") &&
+    !name.includes("..") &&
+    state.photos.some((photo) => photo.name === name)
+  );
+}
+
 async function uploadPhotos(files) {
   if (!hasSupabase) {
     showToast("Photo cloud needs Supabase config.");
@@ -252,6 +270,21 @@ async function uploadPhotos(files) {
   }
   await refreshPhotos({ quiet: true });
   showToast("Photos uploaded.");
+}
+
+async function deletePhoto(photoName) {
+  if (!hasSupabase) {
+    throw new Error("Photo cloud needs Supabase config.");
+  }
+  if (!isSafePhotoName(photoName)) {
+    throw new Error("That photo could not be deleted safely.");
+  }
+
+  await storageFetch(`object/${photoBucket}/${encodeURIComponent(photoName)}`, {
+    method: "DELETE",
+  });
+  state.photos = state.photos.filter((photo) => photo.name !== photoName);
+  renderPhotos();
 }
 
 async function claimTraveler(personId) {
@@ -573,10 +606,18 @@ function renderPhotos() {
   photoGrid.innerHTML = state.photos
     .map(
       (photo) => `
-        <a class="photo-card" href="${photo.url}" target="_blank" rel="noreferrer">
-          <img src="${photo.url}" alt="Trip photo" loading="lazy" />
+        <article class="photo-card">
+          <a class="photo-link" href="${photo.url}" target="_blank" rel="noreferrer" aria-label="Open ${escapeAttribute(photo.name)}">
+            <img src="${photo.url}" alt="Trip photo" loading="lazy" />
+          </a>
           <span>${escapeHtml(photo.name)}</span>
-        </a>
+          <div class="photo-actions">
+            <a class="secondary-button photo-action" href="${photo.url}" download="${escapeAttribute(photo.name)}" target="_blank" rel="noreferrer">Download</a>
+            <button class="danger-button photo-action" type="button" data-action="delete-photo" data-photo-name="${escapeAttribute(photo.name)}" ${deletePhotoName === photo.name ? "disabled" : ""}>
+              ${deletePhotoName === photo.name ? "Deleting..." : "Delete"}
+            </button>
+          </div>
+        </article>
       `,
     )
     .join("");
@@ -751,7 +792,7 @@ notifyButton.addEventListener("click", async () => {
     return;
   }
   const permission = await Notification.requestPermission();
-  showToast(permission === "granted" ? "Alarms enabled for this browser." : "Notifications were not enabled.");
+  showToast(permission === "granted" ? "Notifications enabled for this browser." : "Notifications were not enabled.");
 });
 
 photoUpload.addEventListener("change", async (event) => {
@@ -844,9 +885,63 @@ document.body.addEventListener("click", async (event) => {
       showToast(error.message);
     }
   }
+  if (action === "delete-photo") {
+    const photoName = target.dataset.photoName || "";
+    if (!window.confirm("Delete this photo from the shared gallery?")) return;
+    try {
+      deletePhotoName = photoName;
+      renderPhotos();
+      await deletePhoto(photoName);
+      showToast("Photo deleted.");
+      await refreshPhotos({ quiet: true });
+    } catch (error) {
+      showToast(error.message);
+    } finally {
+      deletePhotoName = "";
+      renderPhotos();
+    }
+  }
 });
 
+function scheduleRealtimeReconnect() {
+  if (realtimeReconnectTimer || !realtimeClient) return;
+  realtimeReconnectTimer = window.setTimeout(() => {
+    realtimeReconnectTimer = null;
+    setupRealtime();
+  }, 5000);
+}
+
+function setupRealtime() {
+  if (!realtimeClient) return;
+
+  if (realtimeChannel) {
+    realtimeClient.removeChannel(realtimeChannel);
+  }
+
+  const refreshFromRealtime = () => refreshState({ quiet: true });
+  const refreshPhotosFromRealtime = () => refreshPhotos({ quiet: true });
+  realtimeChannel = realtimeClient
+    .channel("morocco-trip-live-state")
+    .on("postgres_changes", { event: "*", schema: "public", table: "checkins" }, refreshFromRealtime)
+    .on("postgres_changes", { event: "*", schema: "public", table: "reservations" }, refreshFromRealtime)
+    .on("postgres_changes", { event: "*", schema: "public", table: "events" }, refreshFromRealtime)
+    .on("postgres_changes", { event: "*", schema: "public", table: "people" }, refreshFromRealtime)
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "storage", table: "objects", filter: `bucket_id=eq.${photoBucket}` },
+      refreshPhotosFromRealtime,
+    )
+    .subscribe((status) => {
+      if (status === "SUBSCRIBED") return;
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+        showToast("Live updates paused. Backup refresh is still running.");
+        scheduleRealtimeReconnect();
+      }
+    });
+}
+
 render();
+setupRealtime();
 refreshState();
 refreshPhotos();
 window.setInterval(() => {

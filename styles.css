@@ -630,6 +630,11 @@ textarea {
   padding: 0.55rem;
 }
 
+.photo-link {
+  color: inherit;
+  text-decoration: none;
+}
+
 .photo-card img {
   width: 100%;
   aspect-ratio: 1;
@@ -643,6 +648,27 @@ textarea {
   font-size: 0.78rem;
   font-weight: 800;
   overflow-wrap: anywhere;
+}
+
+.photo-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.photo-action {
+  display: inline-flex;
+  min-height: 2.7rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.65rem 0.75rem;
+  text-align: center;
+  text-decoration: none;
+}
+
+.photo-action:disabled {
+  cursor: wait;
+  opacity: 0.75;
 }
 
 .toast {
