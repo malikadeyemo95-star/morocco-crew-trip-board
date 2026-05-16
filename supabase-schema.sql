@@ -33,6 +33,7 @@ create table if not exists expenses (
   amount numeric(10, 2) not null check (amount > 0),
   paid_by text not null references people(id) on delete restrict,
   split_between jsonb not null default '[]'::jsonb,
+  paid_people jsonb not null default '[]'::jsonb,
   spent_at date not null default current_date,
   created_at timestamptz not null default now()
 );

@@ -72,6 +72,7 @@ let deletePhotoName = "";
 let pendingPhotoDeleteName = "";
 let selectedDay = "";
 let expensesShared = true;
+let realtimeStatus = "connecting";
 
 const panels = {
   schedule: document.querySelector("#schedulePanel"),
@@ -105,6 +106,7 @@ const settlementList = document.querySelector("#settlementList");
 const expenseList = document.querySelector("#expenseList");
 const expenseSyncNotice = document.querySelector("#expenseSyncNotice");
 const tripSetupDetails = document.querySelector("#tripSetupDetails");
+const liveSyncBanner = document.querySelector("#liveSyncBanner");
 
 function getClientId() {
   let saved = localStorage.getItem(clientIdKey);
@@ -282,6 +284,7 @@ async function refreshExpenses({ quiet = false } = {}) {
       amount: Number(row.amount) || 0,
       paidBy: row.paid_by,
       splitBetween: Array.isArray(row.split_between) ? row.split_between : [],
+      paidPeople: Array.isArray(row.paid_people) ? row.paid_people : [],
       spentAt: row.spent_at,
     }));
     expensesShared = true;
@@ -306,6 +309,7 @@ async function addExpense(expense) {
     amount: Math.round(expense.amount * 100) / 100,
     paidBy: expense.paidBy,
     splitBetween: expense.splitBetween,
+    paidPeople: expense.paidPeople || [expense.paidBy],
     spentAt: expense.spentAt || new Date().toISOString().slice(0, 10),
   };
 
@@ -328,6 +332,7 @@ async function addExpense(expense) {
       amount: nextExpense.amount,
       paid_by: nextExpense.paidBy,
       split_between: nextExpense.splitBetween,
+      paid_people: nextExpense.paidPeople,
       spent_at: nextExpense.spentAt,
     }),
   });
@@ -357,6 +362,7 @@ async function importLocalExpenses() {
         amount: Number(expense.amount) || 0,
         paid_by: expense.paidBy,
         split_between: Array.isArray(expense.splitBetween) ? expense.splitBetween : [],
+        paid_people: Array.isArray(expense.paidPeople) ? expense.paidPeople : expense.paidBy ? [expense.paidBy] : [],
         spent_at: expense.spentAt || new Date().toISOString().slice(0, 10),
       })),
     ),
@@ -377,6 +383,32 @@ async function deleteExpense(expenseId) {
   await supabaseFetch(`expenses?id=eq.${encodeURIComponent(expenseId)}`, {
     method: "DELETE",
     prefer: "return=minimal",
+  });
+  await refreshExpenses({ quiet: true });
+}
+
+async function toggleExpensePaidPerson(expenseId, personId) {
+  const expense = (state.expenses || []).find((item) => item.id === expenseId);
+  if (!expense || !expense.splitBetween.includes(personId)) return;
+
+  const paidPeople = new Set(expense.paidPeople || []);
+  if (paidPeople.has(personId)) {
+    paidPeople.delete(personId);
+  } else {
+    paidPeople.add(personId);
+  }
+  expense.paidPeople = [...paidPeople];
+
+  if (!hasSupabase || !expensesShared) {
+    saveLocalExpenses();
+    renderExpenses();
+    return;
+  }
+
+  await supabaseFetch(`expenses?id=eq.${encodeURIComponent(expenseId)}`, {
+    method: "PATCH",
+    prefer: "return=minimal",
+    body: JSON.stringify({ paid_people: expense.paidPeople }),
   });
   await refreshExpenses({ quiet: true });
 }
@@ -753,13 +785,33 @@ function getStatusSummary(event) {
 }
 
 function getInitials(name) {
-  return String(name)
+  return getDisplayName(name)
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)
     .map((part) => part[0])
     .join("")
     .toUpperCase();
+}
+
+function getDisplayName(name) {
+  const clean = String(name || "").trim();
+  return clean || "Unnamed traveler";
+}
+
+function getAvatarLabel(person) {
+  const name = getDisplayName(person?.name);
+  const compact = name.replace(/[^a-z0-9]/gi, "").toUpperCase() || "UT";
+  const otherNames = state.people
+    .filter((item) => item.id !== person?.id)
+    .map((item) => getDisplayName(item.name).replace(/[^a-z0-9]/gi, "").toUpperCase());
+  for (let length = 1; length <= Math.min(3, compact.length); length += 1) {
+    const prefix = compact.slice(0, length);
+    if (!otherNames.some((otherName) => otherName.startsWith(prefix))) {
+      return prefix;
+    }
+  }
+  return compact.slice(0, Math.min(3, compact.length));
 }
 
 function renderEventCard(event) {
@@ -776,7 +828,7 @@ function renderEventCard(event) {
       <section class="my-status-card status-${activeStatus}" aria-label="Update my status">
         <div>
           <p class="eyebrow">My status</p>
-          <h5>${escapeHtml(activePerson.name)}</h5>
+          <h5>${escapeHtml(getDisplayName(activePerson.name))}</h5>
         </div>
         <div class="status-choice-grid" role="group" aria-label="Choose your status">
           ${statusOptions
@@ -812,8 +864,8 @@ function renderEventCard(event) {
       const status = event.checkins[person.id] || "not-ready";
       const option = getStatusOption(status);
       return `
-        <span class="status-avatar status-${status}" title="${escapeAttribute(`${person.name}: ${option.label}`)}" aria-label="${escapeAttribute(`${person.name}: ${option.label}`)}">
-          ${escapeHtml(getInitials(person.name))}
+        <span class="status-avatar status-${status}" title="${escapeAttribute(`${getDisplayName(person.name)}: ${option.label}`)}" aria-label="${escapeAttribute(`${getDisplayName(person.name)}: ${option.label}`)}">
+          ${escapeHtml(getAvatarLabel(person))}
         </span>
       `;
     })
@@ -825,7 +877,7 @@ function renderEventCard(event) {
 
       return `
         <div class="group-status-row status-${status}">
-          <strong>${escapeHtml(person.name)}</strong>
+          <strong>${escapeHtml(getDisplayName(person.name))}</strong>
           <span class="status-pill status-${status}">${option.label}</span>
         </div>
       `;
@@ -884,9 +936,11 @@ function renderPeople() {
       const isClaimed = Boolean(state.reservations?.[person.id]);
       return `
         <div class="person-card">
-          <div class="person-avatar${isClaimed ? "" : " open-avatar"}">${escapeHtml(getInitials(person.name))}</div>
-          <p class="eyebrow">Traveler ${index + 1}</p>
-          <strong>${escapeHtml(person.name)}</strong>
+          <div class="person-avatar${isClaimed ? "" : " open-avatar"}">${escapeHtml(getAvatarLabel(person))}</div>
+          <div class="person-copy">
+            <p class="eyebrow">Traveler ${index + 1}</p>
+            <strong>${escapeHtml(getDisplayName(person.name))}</strong>
+          </div>
           <span class="${isClaimed ? "claimed" : "open"}">${isClaimed ? "Claimed" : "Open"}</span>
         </div>
       `;
@@ -1034,6 +1088,19 @@ function renderExpenseCard(expense) {
   const splitCount = expense.splitBetween.length || 1;
   const eachOwes = expense.amount / splitCount;
   const splitNames = expense.splitBetween.map(getPersonName).join(", ");
+  const paidPeople = new Set(expense.paidPeople || []);
+  const paidCount = expense.splitBetween.filter((personId) => paidPeople.has(personId)).length;
+  const paidChips = expense.splitBetween
+    .map((personId) => {
+      const paid = paidPeople.has(personId);
+      return `
+        <button class="paid-person-chip${paid ? " paid" : ""}" type="button" data-action="toggle-paid-person" data-expense-id="${escapeAttribute(expense.id)}" data-person-id="${escapeAttribute(personId)}" aria-pressed="${paid}">
+          <span>${paid ? "✓" : ""}</span>
+          ${escapeHtml(getPersonName(personId))}
+        </button>
+      `;
+    })
+    .join("");
   return `
     <article class="expense-item">
       <div>
@@ -1041,6 +1108,10 @@ function renderExpenseCard(expense) {
         <h5>${escapeHtml(expense.description)}</h5>
         <p>${escapeHtml(getPersonName(expense.paidBy))} paid ${formatMoney(expense.amount)}</p>
         <span>Split between ${escapeHtml(splitNames || "the crew")} · ${formatMoney(eachOwes)} each</span>
+        <div class="paid-people-block">
+          <small>${paidCount}/${splitCount} marked paid</small>
+          <div class="paid-people-chips">${paidChips}</div>
+        </div>
       </div>
       <div class="expense-item-side">
         <strong>${formatMoney(expense.amount)}</strong>
@@ -1096,7 +1167,7 @@ function getSettlements(balances) {
 }
 
 function getPersonName(personId) {
-  return state.people.find((person) => person.id === personId)?.name || "Unknown traveler";
+  return getDisplayName(state.people.find((person) => person.id === personId)?.name);
 }
 
 function formatMoney(amount) {
@@ -1540,6 +1611,14 @@ document.body.addEventListener("click", async (event) => {
       showToast(error.message);
     }
   }
+  if (action === "toggle-paid-person") {
+    try {
+      await toggleExpensePaidPerson(target.dataset.expenseId || "", target.dataset.personId || "");
+    } catch (error) {
+      await refreshExpenses({ quiet: true });
+      showToast(error.message);
+    }
+  }
   if (action === "import-local-expenses") {
     try {
       target.disabled = true;
@@ -1560,6 +1639,18 @@ function scheduleRealtimeReconnect() {
     realtimeReconnectTimer = null;
     setupRealtime();
   }, 5000);
+}
+
+function renderRealtimeStatus() {
+  if (!liveSyncBanner) return;
+  if (realtimeStatus === "connected") {
+    liveSyncBanner.hidden = true;
+    liveSyncBanner.textContent = "";
+    return;
+  }
+  liveSyncBanner.hidden = false;
+  liveSyncBanner.className = "live-sync-banner warning";
+  liveSyncBanner.innerHTML = `<strong>Live sync reconnecting.</strong><span>Backup refresh is keeping trip data current.</span>`;
 }
 
 function setupRealtime() {
@@ -1584,9 +1675,14 @@ function setupRealtime() {
       refreshPhotosFromRealtime,
     )
     .subscribe((status) => {
-      if (status === "SUBSCRIBED") return;
+      if (status === "SUBSCRIBED") {
+        realtimeStatus = "connected";
+        renderRealtimeStatus();
+        return;
+      }
       if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-        showToast("Live updates paused. Backup refresh is still running.");
+        realtimeStatus = "reconnecting";
+        renderRealtimeStatus();
         scheduleRealtimeReconnect();
       }
     });

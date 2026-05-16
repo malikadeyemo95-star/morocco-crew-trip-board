@@ -140,6 +140,20 @@ p { margin: 0; color: var(--ink-soft); }
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 96px);
 }
 
+.live-sync-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-bottom: 0.9rem;
+  padding: 0.7rem 0.85rem;
+  background: var(--gold-soft);
+  border: 1px solid rgba(201, 147, 67, 0.28);
+  border-radius: var(--r);
+  color: #765217;
+}
+.live-sync-banner strong { font-size: 0.875rem; white-space: nowrap; }
+.live-sync-banner span { font-size: 0.8125rem; color: inherit; }
+
 /* -------- Sidebar -------- */
 .sidebar {
   display: flex;
@@ -927,18 +941,14 @@ label input, label select, label textarea { margin-top: 0.3rem; }
 }
 .person-card:hover { border-color: var(--line-strong); }
 /* Middle text block grows */
-.person-card .eyebrow { flex: 1; }
-.person-card .eyebrow + strong {
-  /* strong sits on same line as eyebrow via column layout */
-  display: none; /* eyebrow wraps it; handled below */
-}
-/* Restructure: avatar | text block | badge */
-.person-card > :nth-child(2) { /* eyebrow */
+.person-copy {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 0.05rem;
+  min-width: 0;
 }
+.person-copy .eyebrow { margin-bottom: 0; }
 .person-card strong {
   font-size: 0.9375rem;
   font-weight: 600;
@@ -1268,6 +1278,61 @@ label input, label select, label textarea { margin-top: 0.3rem; }
 
 .expense-item strong, .expense-item-title { font-weight: 600; color: var(--ink); font-size: 0.9375rem; }
 
+.paid-people-block {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.7rem;
+}
+.paid-people-block small {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.paid-people-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.paid-person-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 36px;
+  padding: 0.35rem 0.65rem;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  color: var(--ink-soft);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  transition:
+    background-color var(--dur-2) var(--ease-out),
+    border-color var(--dur-2) var(--ease-out),
+    color var(--dur-2) var(--ease-out),
+    transform var(--dur-1) var(--ease-out);
+}
+.paid-person-chip span {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface-sunk);
+  color: transparent;
+  font-size: 0.72rem;
+  line-height: 1;
+}
+.paid-person-chip.paid {
+  color: var(--accent-deep);
+  background: var(--accent-tint);
+  border-color: rgba(14, 92, 80, 0.28);
+}
+.paid-person-chip.paid span {
+  color: #fff;
+  background: var(--accent);
+}
+.paid-person-chip:active { transform: scale(0.98); }
+
 /* Trip setup details */
 .trip-setup-details {
   margin-top: 1rem;
@@ -1461,6 +1526,40 @@ label input, label select, label textarea { margin-top: 0.3rem; }
   /* Identity row */
   .identity-card { padding: 0.6rem 0.75rem; }
   .identity-card select { font-size: 0.875rem; }
+}
+
+@media (max-width: 880px) {
+  button,
+  .upload-button,
+  .identity-reset,
+  .icon-button,
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  .live-sync-banner {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.15rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .expense-item h5 {
+    white-space: normal;
+    overflow: visible;
+  }
+
+  .paid-person-chip {
+    min-height: 40px;
+  }
 }
 
 /* -------- Confirm sheet / dialog -------- */
