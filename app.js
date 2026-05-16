@@ -390,14 +390,16 @@ async function deleteExpense(expenseId) {
 async function toggleExpensePaidPerson(expenseId, personId) {
   const expense = (state.expenses || []).find((item) => item.id === expenseId);
   if (!expense || !expense.splitBetween.includes(personId)) return;
+  if (personId === expense.paidBy) return;
 
-  const paidPeople = new Set(expense.paidPeople || []);
+  const paidPeople = getExpensePaidPeople(expense);
   if (paidPeople.has(personId)) {
     paidPeople.delete(personId);
   } else {
     paidPeople.add(personId);
   }
   expense.paidPeople = [...paidPeople];
+  renderExpenses();
 
   if (!hasSupabase || !expensesShared) {
     saveLocalExpenses();
@@ -890,9 +892,10 @@ function renderEventCard(event) {
       <div class="event-time">
         <span class="event-day">${formatDay(event.startsAt)}</span>
         <strong>${formatTime(event.startsAt)}</strong>
-        <div class="smart-reminder-pill ${reminderStatus.tone}">
-          <span>${reminderStatus.label}</span>
-          <small>${reminder.minutes} min before</small>
+        <div class="smart-reminder-card ${reminderStatus.tone}">
+          <span>Smart reminder</span>
+          <strong>${reminderStatus.label}</strong>
+          <small>${formatReminderLead(reminder.minutes)}</small>
         </div>
       </div>
       <div>
@@ -969,8 +972,12 @@ function renderPhotos() {
           </a>
           <span>${escapeHtml(photo.name)}</span>
           <div class="photo-actions">
-            <button class="secondary-button photo-action" type="button" data-action="download-photo" data-photo-name="${escapeAttribute(photo.name)}">Download</button>
+            <button class="secondary-button photo-action" type="button" data-action="download-photo" data-photo-name="${escapeAttribute(photo.name)}">
+              <span aria-hidden="true">${downloadIcon()}</span>
+              Download
+            </button>
             <button class="danger-button photo-action" type="button" data-action="delete-photo" data-photo-name="${escapeAttribute(photo.name)}" ${deletePhotoName === photo.name ? "disabled" : ""}>
+              <span aria-hidden="true">${trashIcon()}</span>
               ${deletePhotoName === photo.name ? "Deleting..." : "Delete"}
             </button>
           </div>
@@ -1089,15 +1096,18 @@ function renderExpenseCard(expense) {
   const splitCount = expense.splitBetween.length || 1;
   const eachOwes = expense.amount / splitCount;
   const splitNames = expense.splitBetween.map(getPersonName).join(", ");
-  const paidPeople = new Set(expense.paidPeople || []);
+  const paidPeople = getExpensePaidPeople(expense);
   const paidCount = expense.splitBetween.filter((personId) => paidPeople.has(personId)).length;
   const paidChips = expense.splitBetween
     .map((personId) => {
       const paid = paidPeople.has(personId);
+      const isPayer = personId === expense.paidBy;
+      const statusLabel = isPayer ? "Settled" : paid ? "Paid" : "Needs to pay";
       return `
-        <button class="paid-person-chip${paid ? " paid" : ""}" type="button" data-action="toggle-paid-person" data-expense-id="${escapeAttribute(expense.id)}" data-person-id="${escapeAttribute(personId)}" aria-pressed="${paid}">
+        <button class="paid-person-chip${paid ? " paid" : ""}${isPayer ? " settled" : ""}" type="button" data-action="toggle-paid-person" data-expense-id="${escapeAttribute(expense.id)}" data-person-id="${escapeAttribute(personId)}" aria-pressed="${paid}" ${isPayer ? "disabled" : ""}>
           <span>${paid ? "✓" : ""}</span>
-          ${escapeHtml(getPersonName(personId))}
+          <b>${escapeHtml(getPersonName(personId))}</b>
+          <small>${statusLabel}</small>
         </button>
       `;
     })
@@ -1129,13 +1139,19 @@ function getExpenseTotals(expenses) {
     const amount = Number(expense.amount) || 0;
     const splitBetween = expense.splitBetween?.length ? expense.splitBetween : state.people.map((person) => person.id);
     const share = amount / splitBetween.length;
+    const paidPeople = getExpensePaidPeople(expense);
     total += amount;
-    balances[expense.paidBy] = (balances[expense.paidBy] || 0) + amount;
     splitBetween.forEach((personId) => {
+      if (paidPeople.has(personId)) return;
+      balances[expense.paidBy] = (balances[expense.paidBy] || 0) + share;
       balances[personId] = (balances[personId] || 0) - share;
     });
   });
   return { total, balances };
+}
+
+function getExpensePaidPeople(expense) {
+  return new Set([expense.paidBy, ...(expense.paidPeople || [])].filter(Boolean));
 }
 
 function getSettlements(balances) {
@@ -1173,6 +1189,21 @@ function getPersonName(personId) {
 
 function formatMoney(amount) {
   return currencyFormatter.format(Number(amount) || 0);
+}
+
+function formatReminderLead(minutes) {
+  if (!Number.isFinite(minutes) || minutes <= 0) return "No reminder";
+  if (minutes === 60) return "1 hour before";
+  if (minutes % 60 === 0) return `${minutes / 60} hours before`;
+  return `${minutes} minutes before`;
+}
+
+function downloadIcon() {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>`;
+}
+
+function trashIcon() {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="m9 7 1-3h4l1 3"/><path d="M6 7l1 14h10l1-14"/></svg>`;
 }
 
 function formatExpenseDate(value) {
