@@ -994,6 +994,21 @@ label input, label select, label textarea { margin-top: 0.3rem; }
 }
 .person-card .claimed { background: var(--accent-soft); color: var(--accent-deep); border: 1px solid rgba(14,92,80,0.18); }
 .person-card .open { background: var(--surface-sunk); color: var(--muted); border: 1px solid var(--line-strong); }
+.admin-badge {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--r-pill);
+  background: var(--gold-soft);
+  color: #8a6315;
+  border: 1px solid rgba(201, 147, 67, 0.28);
+  flex-shrink: 0;
+}
+body:not([data-admin="true"]) #addEventButton,
+body:not([data-admin="true"]) .event-actions,
+body:not([data-admin="true"]) .trip-setup-details {
+  display: none;
+}
 
 .person-avatar {
   width: 40px; height: 40px;

@@ -3,6 +3,7 @@ const readyNotificationKey = "moroccoReadyNotifications";
 const smartReminderKey = "moroccoSmartReminders";
 const localExpensesKey = "moroccoCrewExpenses";
 const photoBucket = "trip-photos";
+const adminTravelerId = "traveler-1";
 
 const statusOptions = [
   { value: "not-ready", label: "Not ready" },
@@ -702,6 +703,10 @@ function getActiveTravelerName() {
   return activePerson?.name || "your traveler";
 }
 
+function isAdminTraveler() {
+  return getActiveTravelerId() === adminTravelerId;
+}
+
 function renderActiveTraveler() {
   const selected = getActiveTravelerId();
   activeTraveler.innerHTML = [
@@ -716,6 +721,7 @@ function renderActiveTraveler() {
   activeTraveler.value = selected;
   activeTraveler.disabled = Boolean(state.identityLocked && selected);
   resetIdentityButton.hidden = !state.identityLocked;
+  document.body.dataset.admin = isAdminTraveler() ? "true" : "false";
 }
 
 function getItineraryDays() {
@@ -938,6 +944,7 @@ function renderPeople() {
   peopleGrid.innerHTML = state.people
     .map((person, index) => {
       const isClaimed = Boolean(state.reservations?.[person.id]);
+      const isAdmin = person.id === adminTravelerId;
       return `
         <div class="person-card">
           <div class="person-avatar${isClaimed ? "" : " open-avatar"}">${escapeHtml(getAvatarLabel(person))}</div>
@@ -945,6 +952,7 @@ function renderPeople() {
             <p class="eyebrow">Traveler ${index + 1}</p>
             <strong>${escapeHtml(getDisplayName(person.name))}</strong>
           </div>
+          ${isAdmin ? `<span class="admin-badge">Admin</span>` : ""}
           <span class="${isClaimed ? "claimed" : "open"}">${isClaimed ? "Claimed" : "Open"}</span>
         </div>
       `;
@@ -1424,6 +1432,10 @@ document.querySelectorAll(".tab-button").forEach((button) => {
 });
 
 document.querySelector("#addEventButton").addEventListener("click", () => {
+  if (!isAdminTraveler()) {
+    showToast("Only Malik can change trip plans.");
+    return;
+  }
   clearForm();
   if (tripSetupDetails) tripSetupDetails.open = true;
   switchTab("settings");
@@ -1507,6 +1519,10 @@ confirmPhotoDeleteButton.addEventListener("click", async () => {
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (!isAdminTraveler()) {
+    showToast("Only Malik can change trip plans.");
+    return;
+  }
   const eventData = {
     id: editingEventId || crypto.randomUUID(),
     title: document.querySelector("#eventTitle").value.trim(),
@@ -1537,6 +1553,10 @@ form.addEventListener("submit", async (event) => {
 });
 
 document.querySelector("#resetButton").addEventListener("click", async () => {
+  if (!isAdminTraveler()) {
+    showToast("Only Malik can reset the trip.");
+    return;
+  }
   clearForm();
   try {
     await resetTripData();
@@ -1588,9 +1608,17 @@ document.body.addEventListener("click", async (event) => {
   if (!target) return;
   const action = target.dataset.action;
   if (action === "edit") {
+    if (!isAdminTraveler()) {
+      showToast("Only Malik can change trip plans.");
+      return;
+    }
     editEvent(target.dataset.eventId);
   }
   if (action === "delete") {
+    if (!isAdminTraveler()) {
+      showToast("Only Malik can change trip plans.");
+      return;
+    }
     try {
       await deleteEvent(target.dataset.eventId);
       showToast("Event deleted.");
