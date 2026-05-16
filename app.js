@@ -880,15 +880,17 @@ function renderEventCard(event) {
 
 function renderPeople() {
   peopleGrid.innerHTML = state.people
-    .map(
-      (person, index) => `
+    .map((person, index) => {
+      const isClaimed = Boolean(state.reservations?.[person.id]);
+      return `
         <div class="person-card">
+          <div class="person-avatar${isClaimed ? "" : " open-avatar"}">${escapeHtml(getInitials(person.name))}</div>
           <p class="eyebrow">Traveler ${index + 1}</p>
           <strong>${escapeHtml(person.name)}</strong>
-          <span class="${state.reservations?.[person.id] ? "claimed" : "open"}">${state.reservations?.[person.id] ? "Claimed" : "Open"}</span>
+          <span class="${isClaimed ? "claimed" : "open"}">${isClaimed ? "Claimed" : "Open"}</span>
         </div>
-      `,
-    )
+      `;
+    })
     .join("");
 }
 
@@ -1169,6 +1171,7 @@ function switchTab(tab) {
   Object.entries(panels).forEach(([key, panel]) => {
     panel.classList.toggle("active", key === tab);
   });
+  document.body.dataset.tab = tab;
   if (tab === "settings") {
     refreshExpenses({ quiet: true });
   }
@@ -1589,6 +1592,7 @@ function setupRealtime() {
     });
 }
 
+document.body.dataset.tab = "schedule";
 render();
 setupRealtime();
 refreshState();

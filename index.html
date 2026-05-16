@@ -2,45 +2,54 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Morocco Crew Trip Board</title>
-    <link rel="stylesheet" href="styles.css?v=20260514-shared-expenses" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#f5f1ea" />
+    <title>Morocco Crew · Trip Board</title>
+    <link rel="stylesheet" href="styles.css?v=20260516-ui-overhaul" />
   </head>
   <body>
     <div class="app-shell">
       <aside class="sidebar" aria-label="Trip navigation">
         <div class="brand">
           <div class="brand-mark" aria-hidden="true">M</div>
-          <div>
-            <p class="eyebrow">Seven-person trip</p>
+          <div class="brand-text">
+            <p class="eyebrow">Aug 16 — 22 · 2026</p>
             <h1>Morocco Crew</h1>
           </div>
         </div>
 
         <nav class="tabs" aria-label="Sections">
           <button class="tab-button active" type="button" data-tab="schedule">
-            <span class="nav-dot" aria-hidden="true"></span>
-            Itinerary
+            <span class="tab-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17"/><path d="M8 3.5v3M16 3.5v3"/></svg>
+            </span>
+            <span class="tab-label">Itinerary</span>
           </button>
           <button class="tab-button" type="button" data-tab="people">
-            <span class="nav-dot nav-dot-ring" aria-hidden="true"></span>
-            Travelers
+            <span class="tab-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5a4 4 0 1 1 8 0 4 4 0 0 1-8 0Z"/><path d="M13.5 13a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0Z"/><path d="M2 20.5c.5-3 3-4.5 5-4.5s4.5 1.5 5 4.5"/><path d="M14.5 20.5c.4-2.2 2.1-3.5 3.5-3.5s3.1 1.3 3.5 3.5"/></svg>
+            </span>
+            <span class="tab-label">Crew</span>
           </button>
           <button class="tab-button" type="button" data-tab="photos">
-            <span class="nav-dot nav-dot-photo" aria-hidden="true"></span>
-            Photos
+            <span class="tab-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="11" r="2"/><path d="m3.5 17 4-4 4 4 3.5-3 5.5 5"/></svg>
+            </span>
+            <span class="tab-label">Photos</span>
           </button>
           <button class="tab-button" type="button" data-tab="settings">
-            <span class="nav-dot nav-dot-split" aria-hidden="true"></span>
-            Expenses
+            <span class="tab-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M4 12h10"/><path d="M4 17h13"/><circle cx="18" cy="7" r="1.8"/><circle cx="17" cy="12" r="1.8"/><circle cx="20" cy="17" r="1.8"/></svg>
+            </span>
+            <span class="tab-label">Expenses</span>
           </button>
         </nav>
 
         <div class="trip-card">
-          <p class="eyebrow">Next up</p>
-          <h2 id="nextEventTitle">Loading...</h2>
+          <p class="eyebrow">Up next</p>
+          <h2 id="nextEventTitle">Loading…</h2>
           <p id="nextEventTime"></p>
-          <div class="countdown" id="nextCountdown">--</div>
+          <div class="countdown" id="nextCountdown">—</div>
         </div>
 
         <div class="identity-card">
@@ -53,72 +62,73 @@
       </aside>
 
       <main>
-        <section class="topbar">
-          <div>
-            <p class="eyebrow">Shared readiness tracker</p>
-            <h2>Know who is ready before every plan</h2>
-          </div>
-          <div class="topbar-actions">
-            <button class="secondary-button" id="notifyButton" type="button">Enable smart reminders</button>
-            <button class="primary-button" id="addEventButton" type="button">Add event</button>
-          </div>
-        </section>
-
-        <section class="morocco-strip" aria-label="Morocco trip mood board">
-          <div class="tile tile-courtyard">
-            <span class="arch arch-left"></span>
-            <span class="arch arch-center"></span>
-            <span class="arch arch-right"></span>
-          </div>
-          <div class="tile tile-zellige"></div>
-          <div class="tile tile-sunset"></div>
-          <div class="tile tile-lantern">
-            <span></span>
-          </div>
-        </section>
-
-        <section class="tab-panel active" id="schedulePanel">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Plan</p>
-              <h3>Trip Itinerary</h3>
+        <section class="tab-panel active" id="schedulePanel" data-page="schedule">
+          <header class="page-header page-header-schedule">
+            <div class="page-header-text">
+              <p class="eyebrow">Itinerary · Marrakech</p>
+              <h2>Plans for the trip</h2>
+              <p class="page-sub">Day-by-day timing, places, and notes. Tap a day to focus.</p>
             </div>
-          </div>
+            <div class="page-header-actions">
+              <button class="primary-button" id="addEventButton" type="button">
+                <span aria-hidden="true" class="btn-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                </span>
+                Add event
+              </button>
+            </div>
+          </header>
           <div class="day-switcher" id="daySwitcher" role="tablist" aria-label="Choose itinerary day"></div>
           <div class="event-list" id="eventList"></div>
         </section>
 
-        <section class="tab-panel" id="peoplePanel">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Travelers</p>
-              <h3>Claimed Names</h3>
+        <section class="tab-panel" id="peoplePanel" data-page="people">
+          <header class="page-header page-header-people">
+            <div class="page-header-text">
+              <p class="eyebrow">Crew dashboard · 7 travelers</p>
+              <h2>Who is ready</h2>
+              <p class="page-sub">Shared readiness for the next plan. Pick your status, see everyone else at a glance.</p>
             </div>
-          </div>
+            <div class="page-header-actions">
+              <button class="secondary-button" id="notifyButton" type="button">
+                <span aria-hidden="true" class="btn-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 1 1 12 0v4l1.5 2.5h-15L6 13Z"/><path d="M10 18a2 2 0 0 0 4 0"/></svg>
+                </span>
+                Smart reminders
+              </button>
+            </div>
+          </header>
           <div class="people-grid" id="peopleGrid"></div>
         </section>
 
-        <section class="tab-panel" id="photosPanel">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Shared cloud</p>
-              <h3>Trip Photos</h3>
+        <section class="tab-panel" id="photosPanel" data-page="photos">
+          <header class="page-header page-header-photos">
+            <div class="page-header-text">
+              <p class="eyebrow">Shared gallery</p>
+              <h2>Trip photos</h2>
+              <p class="page-sub">Memories from the crew. Tap any photo to download or remove.</p>
             </div>
-            <label class="upload-button">
-              Upload photos
-              <input id="photoUpload" type="file" accept="image/*" multiple />
-            </label>
-          </div>
+            <div class="page-header-actions">
+              <label class="upload-button">
+                <span aria-hidden="true" class="btn-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V5"/><path d="m7 10 5-5 5 5"/><path d="M5 19h14"/></svg>
+                </span>
+                Upload
+                <input id="photoUpload" type="file" accept="image/*" multiple />
+              </label>
+            </div>
+          </header>
           <div class="photo-grid" id="photoGrid"></div>
         </section>
 
-        <section class="tab-panel" id="settingsPanel">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Split costs</p>
-              <h3>Expense Splitter</h3>
+        <section class="tab-panel" id="settingsPanel" data-page="expenses">
+          <header class="page-header page-header-expenses">
+            <div class="page-header-text">
+              <p class="eyebrow">Group wallet</p>
+              <h2>Expenses</h2>
+              <p class="page-sub">Split costs fairly. Add a shared expense and we suggest who pays who.</p>
             </div>
-          </div>
+          </header>
           <div class="expense-shell">
             <section class="expense-overview" id="expenseOverview" aria-label="Expense overview"></section>
             <div class="expense-sync-notice" id="expenseSyncNotice" hidden></div>
@@ -211,21 +221,30 @@
 
     <nav class="tabs mobile-tabs" aria-label="Mobile sections">
       <button class="tab-button active" type="button" data-tab="schedule">
-        <span class="nav-dot" aria-hidden="true"></span>
-        Itinerary
+        <span class="tab-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17"/><path d="M8 3.5v3M16 3.5v3"/></svg>
+        </span>
+        <span class="tab-label">Plans</span>
       </button>
       <button class="tab-button" type="button" data-tab="people">
-        <span class="nav-dot nav-dot-ring" aria-hidden="true"></span>
-        Travelers
+        <span class="tab-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5a4 4 0 1 1 8 0 4 4 0 0 1-8 0Z"/><path d="M13.5 13a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0Z"/><path d="M2 20.5c.5-3 3-4.5 5-4.5s4.5 1.5 5 4.5"/><path d="M14.5 20.5c.4-2.2 2.1-3.5 3.5-3.5s3.1 1.3 3.5 3.5"/></svg>
+        </span>
+        <span class="tab-label">Crew</span>
       </button>
       <button class="tab-button" type="button" data-tab="photos">
-        <span class="nav-dot nav-dot-photo" aria-hidden="true"></span>
-        Photos
+        <span class="tab-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="11" r="2"/><path d="m3.5 17 4-4 4 4 3.5-3 5.5 5"/></svg>
+        </span>
+        <span class="tab-label">Photos</span>
       </button>
       <button class="tab-button" type="button" data-tab="settings">
-        <span class="nav-dot nav-dot-split" aria-hidden="true"></span>
-        Expenses
+        <span class="tab-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M4 12h10"/><path d="M4 17h13"/><circle cx="18" cy="7" r="1.8"/><circle cx="17" cy="12" r="1.8"/><circle cx="20" cy="17" r="1.8"/></svg>
+        </span>
+        <span class="tab-label">Split</span>
       </button>
+      <span class="mobile-tab-indicator" aria-hidden="true"></span>
     </nav>
 
     <div class="confirm-backdrop" id="photoConfirmBackdrop" hidden>
@@ -246,7 +265,7 @@
       window.TRIP_CONFIG = window.TRIP_CONFIG || {};
     </script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="config.js?v=20260514-shared-expenses"></script>
-    <script src="app.js?v=20260514-shared-expenses"></script>
+    <script src="config.js?v=20260516-ui-overhaul"></script>
+    <script src="app.js?v=20260516-ui-overhaul"></script>
   </body>
 </html>
