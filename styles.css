@@ -915,7 +915,7 @@ label input, label select, label textarea { margin-top: 0.3rem; }
 }
 .group-status-row {
   display: grid;
-  grid-template-columns: 28px 1fr auto;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
   gap: 0.6rem;
   align-items: center;
   padding: 0.5rem 0.6rem;
@@ -926,7 +926,24 @@ label input, label select, label textarea { margin-top: 0.3rem; }
   font-size: 0.875rem;
 }
 .group-status-row:hover { background: var(--bg-deep); }
-.group-status-row > :first-child { font-weight: 600; color: var(--muted); }
+.group-status-row strong {
+  min-width: 0;
+  color: var(--ink);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.group-status-avatar {
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  color: var(--pill-color);
+  background: var(--pill-bg);
+  border: 1px solid var(--pill-ring);
+  border-radius: 50%;
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
 
 /* Person card — flex row (4 children: avatar, eyebrow+name, badge) */
 .person-card {
@@ -1450,6 +1467,8 @@ label input, label select, label textarea { margin-top: 0.3rem; }
   /* Bottom dock */
   .mobile-tabs {
     display: flex;
+    flex-direction: row;
+    align-items: stretch;
     position: fixed;
     bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
     left: 12px; right: 12px;
@@ -1484,7 +1503,11 @@ label input, label select, label textarea { margin-top: 0.3rem; }
 
 @media (max-width: 480px) {
   /* Tighter padding on very small phones */
-  .app-shell { padding: 10px 12px; }
+  .app-shell {
+    padding: 10px 12px;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 10px);
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 104px);
+  }
 
   /* Brand: hide mark, show text only */
   .brand-mark { width: 32px; height: 32px; font-size: 0.875rem; border-radius: var(--r-sm); }
@@ -1522,6 +1545,14 @@ label input, label select, label textarea { margin-top: 0.3rem; }
   /* Event card */
   .event-card { grid-template-columns: 58px 1fr; padding: 0.7rem 0.75rem; }
   .event-time > strong { font-size: 1rem; }
+
+  .group-status-row {
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+  .group-status-row .status-pill {
+    grid-column: 2;
+    justify-self: start;
+  }
 
   /* Identity row */
   .identity-card { padding: 0.6rem 0.75rem; }

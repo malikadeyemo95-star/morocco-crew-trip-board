@@ -877,6 +877,7 @@ function renderEventCard(event) {
 
       return `
         <div class="group-status-row status-${status}">
+          <span class="group-status-avatar status-${status}" aria-hidden="true">${escapeHtml(getAvatarLabel(person))}</span>
           <strong>${escapeHtml(getDisplayName(person.name))}</strong>
           <span class="status-pill status-${status}">${option.label}</span>
         </div>
