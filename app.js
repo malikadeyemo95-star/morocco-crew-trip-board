@@ -8,10 +8,7 @@ const defaultTripId = "morocco-crew-2026";
 
 const statusOptions = [
   { value: "not-ready", label: "Not ready" },
-  { value: "dressing", label: "Getting dressed" },
   { value: "ready", label: "Ready" },
-  { value: "on-way", label: "On the way" },
-  { value: "done", label: "Done" },
 ];
 
 const currencyFormatter = new Intl.NumberFormat(undefined, {
@@ -225,7 +222,7 @@ async function refreshState({ quiet = false } = {}) {
     const checkinMap = {};
     checkins.forEach((row) => {
       checkinMap[row.event_id] ||= {};
-      checkinMap[row.event_id][row.person_id] = row.status;
+      checkinMap[row.event_id][row.person_id] = normalizeReadinessStatus(row.status);
     });
 
     const storedMemberId = getStoredTripMemberId();
@@ -641,20 +638,6 @@ async function joinTripFromInvite(displayName) {
     }),
   });
 
-  if (state.events.length) {
-    await supabaseFetch("checkins", {
-      method: "POST",
-      prefer: "resolution=merge-duplicates,return=minimal",
-      body: JSON.stringify(
-        state.events.map((event) => ({
-          event_id: event.id,
-          person_id: memberId,
-          status: "not-ready",
-        })),
-      ),
-    });
-  }
-
   setStoredTripMemberId(memberId);
   window.history.replaceState({}, "", window.location.pathname);
   pendingInvite = null;
@@ -688,9 +671,10 @@ async function ensureInviteLink() {
 }
 
 async function updateCheckin(eventId, personId, status) {
+  const nextStatus = normalizeReadinessStatus(status);
   if (!hasSupabase) {
     const event = state.events.find((item) => item.id === eventId);
-    event.checkins[personId] = status;
+    event.checkins[personId] = nextStatus;
     render();
     return;
   }
@@ -698,7 +682,7 @@ async function updateCheckin(eventId, personId, status) {
   await supabaseFetch("checkins", {
     method: "POST",
     prefer: "resolution=merge-duplicates,return=minimal",
-    body: JSON.stringify({ event_id: eventId, person_id: personId, status }),
+    body: JSON.stringify({ event_id: eventId, person_id: personId, status: nextStatus }),
   });
   await refreshState({ quiet: true });
 }
@@ -723,17 +707,6 @@ async function pushEvent(event) {
     }),
   });
 
-  await supabaseFetch("checkins", {
-    method: "POST",
-    prefer: "resolution=merge-duplicates,return=minimal",
-    body: JSON.stringify(
-      state.people.map((person) => ({
-        event_id: event.id,
-        person_id: person.id,
-        status: event.checkins[person.id] || "not-ready",
-      })),
-    ),
-  });
   await refreshState({ quiet: true });
 }
 
@@ -895,6 +868,9 @@ function renderActiveTraveler() {
     identityCard.dataset.role = currentMember?.role || "";
   }
   document.body.dataset.admin = isOrganizerMember() ? "true" : "false";
+  const addEventButton = document.querySelector("#addEventButton");
+  if (addEventButton) addEventButton.hidden = !isOrganizerMember();
+  if (tripSetupDetails) tripSetupDetails.hidden = !isOrganizerMember();
 }
 
 function getItineraryDays() {
@@ -956,6 +932,10 @@ function getStatusOption(status) {
   return statusOptions.find((item) => item.value === status) || statusOptions[0];
 }
 
+function normalizeReadinessStatus(status) {
+  return status === "ready" ? "ready" : "not-ready";
+}
+
 function getStatusSummary(event) {
   return statusOptions
     .map((option) => {
@@ -997,10 +977,9 @@ function getAvatarLabel(person) {
 
 function renderEventCard(event) {
   const readyCount = state.people.filter((person) => event.checkins[person.id] === "ready").length;
-  const doneCount = state.people.filter((person) => event.checkins[person.id] === "done").length;
   const activePersonId = getActiveTravelerId();
   const activePerson = state.people.find((person) => person.id === activePersonId);
-  const activeStatus = activePerson ? event.checkins[activePerson.id] || "not-ready" : "";
+  const activeStatus = activePerson ? normalizeReadinessStatus(event.checkins[activePerson.id]) : "";
   const reminder = getSmartReminder(event);
   const reminderStatus = getReminderStatus(event);
 
@@ -1011,14 +990,9 @@ function renderEventCard(event) {
           <p class="eyebrow">My status</p>
           <h5>${escapeHtml(getDisplayName(activePerson.name))}</h5>
         </div>
-        <div class="status-choice-grid" role="group" aria-label="Choose your status">
-          ${statusOptions
-            .map((option) => {
-              const selected = activeStatus === option.value ? " active" : "";
-              return `<button class="status-choice${selected} status-${option.value}" type="button" data-action="checkin-choice" data-event-id="${event.id}" data-person-id="${activePerson.id}" data-status="${option.value}" aria-pressed="${activeStatus === option.value}">${option.label}</button>`;
-            })
-            .join("")}
-        </div>
+        <button class="ready-toggle status-${activeStatus}" type="button" data-action="checkin-choice" data-event-id="${event.id}" data-person-id="${activePerson.id}" data-status="${activeStatus === "ready" ? "not-ready" : "ready"}" aria-pressed="${activeStatus === "ready"}">
+          ${activeStatus === "ready" ? "Ready" : "Mark ready"}
+        </button>
       </section>
     `
     : `
@@ -1029,36 +1003,15 @@ function renderEventCard(event) {
       </section>
     `;
 
-  const statusSummary = getStatusSummary(event);
-  const summaryChips = statusSummary
-    .map(
-      (item) => `
-        <span class="status-summary-chip status-${item.value}">
-          <strong>${item.count}</strong>
-          ${item.label}
-        </span>
-      `,
-    )
-    .join("");
-  const avatarRow = state.people
-    .map((person) => {
-      const status = event.checkins[person.id] || "not-ready";
-      const option = getStatusOption(status);
-      return `
-        <span class="status-avatar status-${status}" title="${escapeAttribute(`${getDisplayName(person.name)}: ${option.label}`)}" aria-label="${escapeAttribute(`${getDisplayName(person.name)}: ${option.label}`)}">
-          ${escapeHtml(getAvatarLabel(person))}
-        </span>
-      `;
-    })
-    .join("");
+  const notReadyCount = Math.max(0, state.people.length - readyCount);
   const groupStatuses = state.people
     .map((person) => {
-      const status = event.checkins[person.id] || "not-ready";
+      const status = normalizeReadinessStatus(event.checkins[person.id]);
       const option = getStatusOption(status);
       const adminControl =
         isOrganizerMember() && person.id !== activePersonId
           ? `
-            <select class="status-admin-select" data-action="admin-checkin" data-event-id="${event.id}" data-person-id="${person.id}" aria-label="Update ${escapeAttribute(getDisplayName(person.name))} status">
+            <select class="status-admin-select" data-action="admin-checkin" data-event-id="${event.id}" data-person-id="${person.id}" aria-label="Update ${escapeAttribute(getDisplayName(person.name))} readiness">
               ${statusOptions
                 .map(
                   (statusOption) =>
@@ -1071,7 +1024,6 @@ function renderEventCard(event) {
 
       return `
         <div class="group-status-row status-${status}">
-          <span class="group-status-avatar status-${status}" aria-hidden="true">${escapeHtml(getAvatarLabel(person))}</span>
           <strong class="group-status-name">${escapeHtml(getDisplayName(person.name))}</strong>
           ${adminControl}
         </div>
@@ -1096,25 +1048,32 @@ function renderEventCard(event) {
             <h4>${escapeHtml(event.title)}</h4>
             <p class="event-meta">${escapeHtml(event.location || "Location not set")}</p>
           </div>
-          <div class="event-actions">
-            <button class="icon-button" type="button" data-action="edit" data-event-id="${event.id}">Edit</button>
-            <button class="icon-button" type="button" data-action="delete" data-event-id="${event.id}">Delete</button>
-          </div>
+          ${
+            isOrganizerMember()
+              ? `
+                <div class="event-actions">
+                  <button class="icon-button" type="button" data-action="edit" data-event-id="${event.id}">Edit</button>
+                  <button class="icon-button" type="button" data-action="delete" data-event-id="${event.id}">Delete</button>
+                </div>
+              `
+              : ""
+          }
         </div>
         <p>${escapeHtml(event.notes || "No notes yet.")}</p>
         <div class="ready-summary" aria-label="Readiness summary">
-          <span class="status-pill status-ready">${readyCount}/${state.people.length} ready</span>
-          <span class="status-pill status-done">${doneCount}/${state.people.length} done</span>
+          <span class="status-pill status-ready">${readyCount} of ${state.people.length} ready</span>
         </div>
         <div class="status-board">
           ${myStatus}
           <section class="group-status-card" aria-label="Group status">
             <div class="status-section-title">
               <p class="eyebrow">Group status</p>
-              <span>${readyCount}/${state.people.length} ready</span>
+              <span>${readyCount} of ${state.people.length} ready</span>
             </div>
-            <div class="status-summary-chips">${summaryChips}</div>
-            <div class="status-avatar-row" aria-label="Traveler status initials">${avatarRow}</div>
+            <div class="status-summary-chips">
+              <span class="status-summary-chip status-ready"><strong>${readyCount}</strong> Ready</span>
+              <span class="status-summary-chip status-not-ready"><strong>${notReadyCount}</strong> Not ready</span>
+            </div>
             <details class="group-status-details">
               <summary>View all travelers</summary>
               <div class="group-status-list">${groupStatuses}</div>

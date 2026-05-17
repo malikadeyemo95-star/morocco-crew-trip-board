@@ -882,6 +882,40 @@ select {
   color: var(--pill-color);
 }
 
+.ready-toggle {
+  min-height: 48px;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 650;
+  text-align: center;
+  transition:
+    background-color var(--dur-2) var(--ease-out),
+    border-color var(--dur-2) var(--ease-out),
+    color var(--dur-2) var(--ease-out),
+    transform var(--dur-1) var(--ease-out);
+}
+.ready-toggle.status-ready {
+  background: var(--emerald-soft);
+  border-color: rgba(45, 189, 143, 0.32);
+  color: var(--emerald);
+}
+@media (hover: hover) and (pointer: fine) {
+  .ready-toggle:hover {
+    border-color: var(--line-bold);
+    background: rgba(255, 255, 255, 0.06);
+  }
+  .ready-toggle.status-ready:hover {
+    background: rgba(45, 189, 143, 0.18);
+  }
+}
+.ready-toggle:active {
+  transform: scale(0.98);
+}
+
 /* Status avatar (small) */
 .status-avatar-row {
   display: flex;
@@ -950,7 +984,7 @@ select {
 }
 .group-status-row {
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 0.6rem;
   align-items: center;
   padding: 0.5rem 0.6rem;
@@ -959,18 +993,6 @@ select {
   border: 1px solid transparent;
   transition: background-color var(--dur-2) var(--ease-out);
   font-size: 0.875rem;
-}
-.group-status-avatar {
-  display: inline-grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: var(--pill-bg);
-  color: var(--pill-color);
-  border: 1px solid var(--pill-ring);
-  font-size: 0.75rem;
-  font-weight: 700;
 }
 .group-status-name {
   min-width: 0;
@@ -983,7 +1005,6 @@ select {
   font-size: 0.75rem;
 }
 .group-status-row:hover { background: rgba(255, 255, 255, 0.05); }
-.group-status-row > :first-child { font-weight: 600; color: var(--muted); }
 
 .ready-summary strong { color: var(--ink); font-weight: 600; }
 
@@ -1671,11 +1692,10 @@ select {
   }
   .event-time > strong { font-size: 1rem; }
   .group-status-row {
-    grid-template-columns: 30px minmax(0, 1fr);
+    grid-template-columns: 1fr;
     align-items: start;
   }
   .group-status-row .status-pill {
-    grid-column: 2;
     justify-self: start;
   }
   .expense-item {
@@ -1690,7 +1710,6 @@ select {
     flex-direction: column;
   }
   .status-admin-select {
-    grid-column: 2;
     min-width: 0;
     width: 100%;
   }
