@@ -74,6 +74,7 @@ let expensesShared = true;
 let realtimeStatus = "connecting";
 let pendingInvite = null;
 let lastTripRenderSignature = "";
+const htmlRenderCache = new WeakMap();
 
 const panels = {
   today: document.querySelector("#todayPanel"),
@@ -821,6 +822,12 @@ function sortedEvents() {
   return [...state.events].sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt));
 }
 
+function setStableHtml(element, html) {
+  if (!element || htmlRenderCache.get(element) === html) return;
+  element.innerHTML = html;
+  htmlRenderCache.set(element, html);
+}
+
 function render() {
   renderTripState();
   lastTripRenderSignature = getTripRenderSignature();
@@ -877,16 +884,17 @@ function renderToday() {
   if (todayPlansTitle) todayPlansTitle.textContent = focusLabel;
 
   if (!next) {
-    todayNextCard.innerHTML = `
+    todayNextCard.dataset.eventId = "";
+    setStableHtml(todayNextCard, `
       <p class="eyebrow">Up next</p>
       <h3>Trip complete</h3>
       <p>No upcoming plans remain.</p>
-    `;
-    todayActionCard.innerHTML = `
+    `);
+    setStableHtml(todayActionCard, `
       <p class="eyebrow">Quick actions</p>
       <h3>All plans complete</h3>
       <button class="secondary-button" type="button" data-action="today-add-expense">Add expense</button>
-    `;
+    `);
   } else {
     const readyCount = state.people.filter((person) => next.checkins[person.id] === "ready").length;
     const activePersonId = getActiveTravelerId();
@@ -895,7 +903,8 @@ function renderToday() {
     const reminder = getSmartReminder(next);
     const reminderStatus = getReminderStatus(next);
 
-    todayNextCard.innerHTML = `
+    todayNextCard.dataset.eventId = next.id;
+    setStableHtml(todayNextCard, `
       <div class="today-card-head">
         <p class="eyebrow">Up next</p>
         <span class="today-countdown">${getCountdown(next.startsAt)}</span>
@@ -906,8 +915,8 @@ function renderToday() {
         <span class="status-pill status-ready">${readyCount} of ${state.people.length} ready</span>
         <span class="today-reminder ${reminderStatus.tone}">${reminderStatus.label} · ${formatReminderLead(reminder.minutes)}</span>
       </div>
-    `;
-    todayActionCard.innerHTML = `
+    `);
+    setStableHtml(todayActionCard, `
       <p class="eyebrow">Quick actions</p>
       <h3>${activePerson ? escapeHtml(getDisplayName(activePerson.name)) : "Join the trip"}</h3>
       <div class="today-actions">
@@ -918,10 +927,10 @@ function renderToday() {
         }
         <button class="secondary-button" type="button" data-action="today-add-expense">Add expense</button>
       </div>
-    `;
+    `);
   }
 
-  todayTimeline.innerHTML = focusEvents.length
+  setStableHtml(todayTimeline, focusEvents.length
     ? focusEvents
         .map(
           (event) => `
@@ -935,7 +944,26 @@ function renderToday() {
           `,
         )
         .join("")
-    : `<div class="empty-state compact"><span aria-hidden="true">Plan</span><h4>No plans for this day.</h4><p>The itinerary is clear for now.</p></div>`;
+    : `<div class="empty-state compact"><span aria-hidden="true">Plan</span><h4>No plans for this day.</h4><p>The itinerary is clear for now.</p></div>`);
+}
+
+function refreshTodayClock() {
+  if (!todayNextCard) return;
+  const next = getNextEvent();
+  if ((next?.id || "") !== todayNextCard.dataset.eventId) {
+    renderToday();
+    return;
+  }
+  if (!next) return;
+  const countdown = todayNextCard.querySelector(".today-countdown");
+  const reminderLabel = todayNextCard.querySelector(".today-reminder");
+  const reminder = getSmartReminder(next);
+  const reminderStatus = getReminderStatus(next);
+  if (countdown) countdown.textContent = getCountdown(next.startsAt);
+  if (reminderLabel) {
+    reminderLabel.className = `today-reminder ${reminderStatus.tone}`;
+    reminderLabel.textContent = `${reminderStatus.label} · ${formatReminderLead(reminder.minutes)}`;
+  }
 }
 
 function renderJoinGate() {
@@ -1229,7 +1257,7 @@ function renderPeople() {
     crewHeaderEyebrow.textContent = `Crew dashboard · ${state.people.length} ${label}`;
   }
   renderOrganiserPanel();
-  peopleGrid.innerHTML = state.people
+  setStableHtml(peopleGrid, state.people
     .map((person, index) => {
       const isCurrentMember = person.id === getActiveTravelerId();
       const isAdmin = person.role === "organiser";
@@ -1252,21 +1280,21 @@ function renderPeople() {
         </div>
       `;
     })
-    .join("");
+    .join(""));
 }
 
 function renderPhotos() {
   if (!photoGrid) return;
   if (!hasSupabase) {
-    photoGrid.innerHTML = `<div class="empty-state"><span aria-hidden="true">Cloud</span><h4>Photo cloud is waiting.</h4><p>Connect Supabase to share trip photos here.</p></div>`;
+    setStableHtml(photoGrid, `<div class="empty-state"><span aria-hidden="true">Cloud</span><h4>Photo cloud is waiting.</h4><p>Connect Supabase to share trip photos here.</p></div>`);
     return;
   }
   if (!state.photos?.length) {
-    photoGrid.innerHTML = `<div class="empty-state"><span aria-hidden="true">Gallery</span><h4>No trip photos yet.</h4><p>Upload the first memory and everyone can save it.</p></div>`;
+    setStableHtml(photoGrid, `<div class="empty-state"><span aria-hidden="true">Gallery</span><h4>No trip photos yet.</h4><p>Upload the first memory and everyone can save it.</p></div>`);
     return;
   }
 
-  photoGrid.innerHTML = state.photos
+  setStableHtml(photoGrid, state.photos
     .map(
       (photo) => `
         <article class="photo-card">
@@ -1287,7 +1315,7 @@ function renderPhotos() {
         </article>
       `,
     )
-    .join("");
+    .join(""));
 }
 
 function renderExpenseControls() {
@@ -1333,7 +1361,7 @@ function renderExpenses() {
         ? `You are owed ${formatMoney(myBalance)}`
         : `You owe ${formatMoney(Math.abs(myBalance))}`;
 
-  expenseOverview.innerHTML = `
+  setStableHtml(expenseOverview, `
     <article class="expense-stat-card">
       <span>Total spent</span>
       <strong>${formatMoney(totals.total)}</strong>
@@ -1350,7 +1378,7 @@ function renderExpenses() {
       <span>Mode</span>
       <strong>${expensesShared ? "Shared wallet" : hasSupabase ? "Local backup" : "Local only"}</strong>
     </article>
-  `;
+  `);
 
   if (expenseSyncNotice) {
     const importableCount = expensesShared
@@ -1359,28 +1387,28 @@ function renderExpenses() {
     if (!hasSupabase) {
       expenseSyncNotice.hidden = false;
       expenseSyncNotice.className = "expense-sync-notice warning";
-      expenseSyncNotice.innerHTML = `<strong>Local-only wallet.</strong><span>Add Supabase config to share expenses across phones.</span>`;
+      setStableHtml(expenseSyncNotice, `<strong>Local-only wallet.</strong><span>Add Supabase config to share expenses across phones.</span>`);
     } else if (!expensesShared) {
       expenseSyncNotice.hidden = false;
       expenseSyncNotice.className = "expense-sync-notice warning";
-      expenseSyncNotice.innerHTML = `<strong>Shared wallet not connected.</strong><span>The app is using this device's backup expenses until Supabase is reachable.</span>`;
+      setStableHtml(expenseSyncNotice, `<strong>Shared wallet not connected.</strong><span>The app is using this device's backup expenses until Supabase is reachable.</span>`);
     } else if (importableCount > 0) {
       expenseSyncNotice.hidden = false;
       expenseSyncNotice.className = "expense-sync-notice";
-      expenseSyncNotice.innerHTML = `
+      setStableHtml(expenseSyncNotice, `
         <strong>${importableCount} local expense${importableCount === 1 ? "" : "s"} found.</strong>
         <span>Move them into the shared wallet so everyone can see them.</span>
         <button class="secondary-button" type="button" data-action="import-local-expenses">Import local expenses</button>
-      `;
+      `);
     } else {
       expenseSyncNotice.hidden = false;
       expenseSyncNotice.className = "expense-sync-notice success";
-      expenseSyncNotice.innerHTML = `<strong>Shared wallet connected.</strong><span>Expenses load from Supabase and sync across devices.</span>`;
+      setStableHtml(expenseSyncNotice, `<strong>Shared wallet connected.</strong><span>Expenses load from Supabase and sync across devices.</span>`);
     }
   }
 
   const settlements = getSettlements(totals.balances);
-  settlementList.innerHTML = settlements.length
+  setStableHtml(settlementList, settlements.length
     ? settlements
         .map(
           (settlement) => `
@@ -1392,11 +1420,11 @@ function renderExpenses() {
           `,
         )
         .join("")
-    : `<div class="empty-state compact"><span aria-hidden="true">Settle</span><h4>All settled.</h4><p>No one owes anything yet.</p></div>`;
+    : `<div class="empty-state compact"><span aria-hidden="true">Settle</span><h4>All settled.</h4><p>No one owes anything yet.</p></div>`);
 
-  expenseList.innerHTML = expenses.length
+  setStableHtml(expenseList, expenses.length
     ? expenses.map(renderExpenseCard).join("")
-    : `<div class="empty-state compact"><span aria-hidden="true">Split</span><h4>No expenses added yet.</h4><p>Add your first shared cost.</p></div>`;
+    : `<div class="empty-state compact"><span aria-hidden="true">Split</span><h4>No expenses added yet.</h4><p>Add your first shared cost.</p></div>`);
 }
 
 function renderExpenseCard(expense) {
@@ -2103,7 +2131,7 @@ window.setInterval(() => {
   refreshState({ quiet: true });
   refreshPhotos({ quiet: true });
   refreshExpenses({ quiet: true });
-  renderToday();
+  refreshTodayClock();
   renderNextEvent();
   checkAlarms();
 }, 30000);

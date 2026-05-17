@@ -1747,6 +1747,7 @@ select {
 
   /* Page headers */
   .tab-panel { padding: 0 16px 24px; }
+  .tab-panel { animation: none; }
   .tab-panel.active {
     min-height: calc(100svh - 180px);
   }
