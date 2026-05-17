@@ -61,6 +61,8 @@ let state = createDefaultState();
 let editingEventId = null;
 let realtimeChannel = null;
 let realtimeReconnectTimer = null;
+let realtimeBannerTimer = null;
+let realtimeGeneration = 0;
 let deletePhotoName = "";
 let pendingPhotoDeleteName = "";
 let selectedDay = "";
@@ -2065,17 +2067,27 @@ function scheduleRealtimeReconnect() {
 function renderRealtimeStatus() {
   if (!liveSyncBanner) return;
   if (realtimeStatus === "connected") {
+    if (realtimeBannerTimer) {
+      window.clearTimeout(realtimeBannerTimer);
+      realtimeBannerTimer = null;
+    }
     liveSyncBanner.hidden = true;
     liveSyncBanner.textContent = "";
     return;
   }
-  liveSyncBanner.hidden = false;
-  liveSyncBanner.className = "live-sync-banner warning";
-  liveSyncBanner.innerHTML = `<strong>Live sync reconnecting.</strong><span>Backup refresh is keeping trip data current.</span>`;
+  if (realtimeBannerTimer) return;
+  realtimeBannerTimer = window.setTimeout(() => {
+    realtimeBannerTimer = null;
+    if (realtimeStatus === "connected") return;
+    liveSyncBanner.hidden = false;
+    liveSyncBanner.className = "live-sync-banner warning";
+    liveSyncBanner.innerHTML = `<strong>Live sync reconnecting.</strong><span>Backup refresh is keeping trip data current.</span>`;
+  }, 10000);
 }
 
 function setupRealtime() {
   if (!realtimeClient) return;
+  const generation = ++realtimeGeneration;
 
   if (realtimeChannel) {
     realtimeClient.removeChannel(realtimeChannel);
@@ -2095,6 +2107,7 @@ function setupRealtime() {
       refreshPhotosFromRealtime,
     )
     .subscribe((status) => {
+      if (generation !== realtimeGeneration) return;
       if (status === "SUBSCRIBED") {
         realtimeStatus = "connected";
         renderRealtimeStatus();
