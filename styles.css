@@ -100,11 +100,9 @@ html {
   /* Prevent iOS font inflation on rotation */
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
-  /* Stop elastic scroll from causing reflow */
-  overscroll-behavior: none;
 }
 html, body { min-height: 100%; }
-body { overflow-x: hidden; overscroll-behavior: none; }
+body { overflow-x: hidden; }
 
 body {
   margin: 0;
@@ -203,6 +201,8 @@ p { margin: 0; color: var(--ink-soft); }
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-width: none;
+  /* Contain scroll bounce inside the sidebar only, not the whole page */
+  overscroll-behavior-y: contain;
 }
 .sidebar::-webkit-scrollbar { display: none; }
 
