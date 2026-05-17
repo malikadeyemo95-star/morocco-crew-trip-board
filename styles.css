@@ -94,9 +94,17 @@
 /* -------- Reset -------- */
 *, *::before, *::after { box-sizing: border-box; }
 
-html { background: var(--bg); overflow-x: hidden; }
+html {
+  background: var(--bg);
+  overflow-x: hidden;
+  /* Prevent iOS font inflation on rotation */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* Stop elastic scroll from causing reflow */
+  overscroll-behavior: none;
+}
 html, body { min-height: 100%; }
-body { overflow-x: hidden; }
+body { overflow-x: hidden; overscroll-behavior: none; }
 
 body {
   margin: 0;
@@ -112,7 +120,7 @@ body {
   position: relative;
 }
 
-/* Subtle ambient glows in background */
+/* Subtle ambient glows in background — isolated on their own GPU layer */
 body::before, body::after {
   content: "";
   position: fixed;
@@ -120,6 +128,9 @@ body::before, body::after {
   z-index: -1;
   border-radius: 50%;
   filter: blur(80px);
+  /* Own compositing layer — keeps repaints from touching the rest of the page */
+  will-change: transform;
+  transform: translateZ(0);
 }
 body::before {
   top: -160px; right: -80px;
@@ -133,7 +144,12 @@ body::after {
 }
 
 button, input, select, textarea { font: inherit; color: inherit; }
-button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+/* Eliminate 300ms tap delay and prevent double-tap zoom on all interactive elements */
+button, a, label, [role="button"], [role="tab"] {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
 a { color: inherit; }
 
 h1, h2, h3, h4, h5 {
@@ -1074,13 +1090,30 @@ select {
 }
 .organiser-panel h3 { margin-bottom: 0.15rem; }
 .organiser-panel p:last-child { font-size: 0.875rem; }
+
+/* Invite actions — button only, input hidden but kept for JS */
 .invite-actions {
   display: flex;
+  flex-direction: column;
   gap: 0.55rem;
 }
-.invite-actions input {
-  min-width: 0;
-  flex: 1;
+/* Keep #inviteLink in the DOM so app.js can write to it, but never show it */
+#inviteLink {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0,0,0,0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+}
+.invite-actions .secondary-button {
+  width: 100%;
+  justify-content: center;
 }
 
 /* -------- Photos -------- */
@@ -1498,6 +1531,14 @@ select {
 .mobile-tabs { display: none; }
 
 @media (max-width: 880px) {
+  /* Prevent iOS from zooming in when focusing inputs (requires font-size ≥ 16px) */
+  input, select, textarea {
+    font-size: max(16px, 1em);
+  }
+
+  /* Disable expensive background glows on mobile — they cause repaint lag */
+  body::before, body::after { display: none; }
+
   .app-shell {
     grid-template-columns: 1fr;
     min-height: 100svh;
@@ -1597,7 +1638,7 @@ select {
     bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
     left: 12px; right: 12px;
     padding: 6px;
-    background: rgba(20, 18, 16, 0.85);
+    background: rgba(20, 18, 16, 0.90);
     backdrop-filter: saturate(140%) blur(20px);
     -webkit-backdrop-filter: saturate(140%) blur(20px);
     border: 1px solid var(--line-strong);
@@ -1605,6 +1646,9 @@ select {
     box-shadow: var(--shadow-3);
     z-index: 30;
     gap: 0;
+    /* Own compositing layer — prevents jitter as content scrolls beneath */
+    will-change: transform;
+    transform: translateZ(0);
   }
   .mobile-tabs .tab-button {
     flex: 1;
@@ -1624,7 +1668,12 @@ select {
     background: transparent;
     text-align: center;
     letter-spacing: 0.02em;
+    /* GPU-only transition — no layout properties change */
+    transition: background-color var(--dur-2) var(--ease-out),
+                color var(--dur-2) var(--ease-out),
+                transform var(--dur-1) var(--ease-out);
   }
+  .mobile-tabs .tab-button:active { transform: scale(0.93); }
   .mobile-tabs .tab-button::after { display: none; }
   .mobile-tabs .tab-button .tab-label { display: inline; }
   .mobile-tabs .tab-button .tab-icon { width: 22px; height: 22px; }
@@ -1705,9 +1754,6 @@ select {
     align-items: flex-start;
     flex-direction: row;
     justify-content: space-between;
-  }
-  .invite-actions {
-    flex-direction: column;
   }
   .status-admin-select {
     min-width: 0;
