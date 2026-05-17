@@ -1,9 +1,10 @@
 const clientIdKey = "moroccoCrewClientId";
+const tripMemberIdKey = "moroccoTripMemberId";
 const readyNotificationKey = "moroccoReadyNotifications";
 const smartReminderKey = "moroccoSmartReminders";
 const localExpensesKey = "moroccoCrewExpenses";
 const photoBucket = "trip-photos";
-const adminTravelerId = "traveler-1";
+const defaultTripId = "morocco-crew-2026";
 
 const statusOptions = [
   { value: "not-ready", label: "Not ready" },
@@ -74,6 +75,7 @@ let pendingPhotoDeleteName = "";
 let selectedDay = "";
 let expensesShared = true;
 let realtimeStatus = "connecting";
+let pendingInvite = null;
 
 const panels = {
   schedule: document.querySelector("#schedulePanel"),
@@ -91,8 +93,18 @@ const toast = document.querySelector("#toast");
 const form = document.querySelector("#eventForm");
 const formTitle = document.querySelector("#formTitle");
 const notifyButton = document.querySelector("#notifyButton");
-const activeTraveler = document.querySelector("#activeTraveler");
-const resetIdentityButton = document.querySelector("#resetIdentityButton");
+const identityCard = document.querySelector("#identityCard");
+const activeTravelerProfile = document.querySelector("#activeTravelerProfile");
+const crewHeaderEyebrow = document.querySelector("#crewHeaderEyebrow");
+const organiserPanel = document.querySelector("#organiserPanel");
+const inviteLink = document.querySelector("#inviteLink");
+const copyInviteButton = document.querySelector("#copyInviteButton");
+const joinGate = document.querySelector("#joinGate");
+const joinGateTitle = document.querySelector("#joinGateTitle");
+const joinGateCopy = document.querySelector("#joinGateCopy");
+const joinGateStatus = document.querySelector("#joinGateStatus");
+const joinForm = document.querySelector("#joinForm");
+const joinName = document.querySelector("#joinName");
 const photoConfirmBackdrop = document.querySelector("#photoConfirmBackdrop");
 const cancelPhotoDeleteButton = document.querySelector("#cancelPhotoDeleteButton");
 const confirmPhotoDeleteButton = document.querySelector("#confirmPhotoDeleteButton");
@@ -118,12 +130,27 @@ function getClientId() {
   return saved;
 }
 
+function getStoredTripMemberId() {
+  return localStorage.getItem(tripMemberIdKey) || "";
+}
+
+function setStoredTripMemberId(memberId) {
+  if (memberId) {
+    localStorage.setItem(tripMemberIdKey, memberId);
+    return;
+  }
+  localStorage.removeItem(tripMemberIdKey);
+}
+
 function createDefaultState() {
   return {
     version: "supabase-ready-v1",
+    trip: null,
     activePersonId: "",
     identityLocked: false,
     people: defaultPeople.map(({ id, name }) => ({ id, name })),
+    currentMember: null,
+    invite: null,
     events: defaultEvents.map((event) => ({ ...event, checkins: { ...event.checkins } })),
     reservations: {},
     photos: [],
@@ -188,11 +215,11 @@ async function refreshState({ quiet = false } = {}) {
   }
 
   try {
-    const [people, events, checkins, reservations] = await Promise.all([
-      supabaseFetch("people?select=*&order=sort_order.asc"),
+    const [trips, members, events, checkins] = await Promise.all([
+      supabaseFetch(`trips?id=eq.${encodeURIComponent(defaultTripId)}&select=*`),
+      supabaseFetch(`trip_members?trip_id=eq.${encodeURIComponent(defaultTripId)}&select=*&order=sort_order.asc,created_at.asc`),
       supabaseFetch("events?select=*&order=starts_at.asc"),
       supabaseFetch("checkins?select=*"),
-      supabaseFetch("reservations?select=*"),
     ]);
 
     const checkinMap = {};
@@ -201,7 +228,33 @@ async function refreshState({ quiet = false } = {}) {
       checkinMap[row.event_id][row.person_id] = row.status;
     });
 
-    state.people = people.map((person) => ({ id: person.id, name: person.name }));
+    const storedMemberId = getStoredTripMemberId();
+    const currentMember =
+      members.find((member) => member.id === storedMemberId && member.device_client_id === clientId) ||
+      members.find((member) => member.device_client_id === clientId) ||
+      null;
+
+    if (currentMember?.id && currentMember.id !== storedMemberId) {
+      setStoredTripMemberId(currentMember.id);
+    } else if (!currentMember && storedMemberId) {
+      setStoredTripMemberId("");
+    }
+
+    state.trip = trips[0] || null;
+    state.people = members.map((member) => ({
+      id: member.id,
+      name: member.display_name,
+      role: member.role,
+      sortOrder: member.sort_order,
+      deviceClientId: member.device_client_id,
+    }));
+    state.currentMember = currentMember
+      ? {
+          id: currentMember.id,
+          name: currentMember.display_name,
+          role: currentMember.role,
+        }
+      : null;
     state.events = events.map((event) => ({
       id: event.id,
       title: event.title,
@@ -215,10 +268,11 @@ async function refreshState({ quiet = false } = {}) {
         ...(checkinMap[event.id] || {}),
       },
     }));
-    state.reservations = Object.fromEntries(reservations.map((row) => [row.person_id, row.client_id]));
-    state.activePersonId = Object.entries(state.reservations).find(([, owner]) => owner === clientId)?.[0] || "";
+    state.reservations = {};
+    state.activePersonId = currentMember?.id || "";
     state.identityLocked = Boolean(state.activePersonId);
     renderTripState();
+    renderJoinGate();
     checkReadyNotifications();
   } catch (error) {
     if (!quiet) showToast("Shared database is not reachable.");
@@ -302,6 +356,9 @@ async function addExpense(expense) {
   if (!expense.description.trim()) throw new Error("Add a short description.");
   if (!Number.isFinite(expense.amount) || expense.amount <= 0) throw new Error("Enter a valid amount.");
   if (!state.people.some((person) => person.id === expense.paidBy)) throw new Error("Choose who paid.");
+  if (!isOrganizerMember() && expense.paidBy !== getActiveTravelerId()) {
+    throw new Error("You can only add expenses you paid.");
+  }
   if (!expense.splitBetween.length) throw new Error("Choose who to split with.");
 
   const nextExpense = {
@@ -374,6 +431,10 @@ async function importLocalExpenses() {
 
 async function deleteExpense(expenseId) {
   if (!expenseId) return;
+  const expense = (state.expenses || []).find((item) => item.id === expenseId);
+  if (expense && !isOrganizerMember() && expense.paidBy !== getActiveTravelerId()) {
+    throw new Error("You can only delete expenses you paid.");
+  }
   if (!hasSupabase || !expensesShared) {
     state.expenses = (state.expenses || []).filter((expense) => expense.id !== expenseId);
     saveLocalExpenses();
@@ -391,6 +452,9 @@ async function deleteExpense(expenseId) {
 async function toggleExpensePaidPerson(expenseId, personId) {
   const expense = (state.expenses || []).find((item) => item.id === expenseId);
   if (!expense || !expense.splitBetween.includes(personId)) return;
+  if (!canManageMemberAction(personId)) {
+    throw new Error("You can only update your own payment status.");
+  }
   if (personId === expense.paidBy) return;
 
   const paidPeople = getExpensePaidPeople(expense);
@@ -498,40 +562,129 @@ async function downloadPhoto(photoName) {
   return "Photo download started.";
 }
 
-async function claimTraveler(personId) {
-  if (!hasSupabase) {
-    state.activePersonId = personId;
-    state.identityLocked = true;
-    render();
+function getInviteTokenFromUrl() {
+  return new URLSearchParams(window.location.search).get("invite") || "";
+}
+
+async function loadPendingInvite() {
+  const inviteToken = getInviteTokenFromUrl();
+  if (!hasSupabase || !inviteToken) {
+    pendingInvite = null;
     return;
   }
 
-  try {
-    await supabaseFetch("reservations", {
-      method: "POST",
-      prefer: "return=minimal",
-      body: JSON.stringify({ person_id: personId, client_id: clientId }),
-    });
-  } catch {
-    throw new Error(`${state.people.find((person) => person.id === personId)?.name || "That traveler"} is already taken.`);
+  const invites = await supabaseFetch(
+    `trip_invites?token=eq.${encodeURIComponent(inviteToken)}&active=eq.true&select=*`,
+  );
+  const invite = invites[0];
+  const expired = invite?.expires_at && new Date(invite.expires_at).getTime() <= Date.now();
+  pendingInvite = invite && !expired ? invite : null;
+}
+
+async function joinTripFromInvite(displayName) {
+  if (!pendingInvite || pendingInvite.trip_id !== defaultTripId) {
+    throw new Error("This invite link is no longer valid.");
   }
 
+  const cleanName = displayName.trim();
+  if (!cleanName) throw new Error("Enter your name to join.");
+
+  const normalizedName = cleanName.toLocaleLowerCase();
+  const matchingMember = state.people.find(
+    (person) =>
+      getDisplayName(person.name).toLocaleLowerCase() === normalizedName &&
+      !person.deviceClientId,
+  );
+  const alreadyJoined = state.people.find(
+    (person) =>
+      getDisplayName(person.name).toLocaleLowerCase() === normalizedName &&
+      person.deviceClientId,
+  );
+  if (alreadyJoined) {
+    throw new Error("That traveler has already joined.");
+  }
+
+  if (matchingMember) {
+    await supabaseFetch(`trip_members?id=eq.${encodeURIComponent(matchingMember.id)}`, {
+      method: "PATCH",
+      prefer: "return=minimal",
+      body: JSON.stringify({ device_client_id: clientId }),
+    });
+    setStoredTripMemberId(matchingMember.id);
+    window.history.replaceState({}, "", window.location.pathname);
+    pendingInvite = null;
+    await refreshState({ quiet: true });
+    return;
+  }
+
+  const nextSortOrder = Math.max(0, ...state.people.map((person) => person.sortOrder || 0)) + 1;
+  const memberId = crypto.randomUUID();
+  await supabaseFetch("trip_members", {
+    method: "POST",
+    prefer: "return=minimal",
+    body: JSON.stringify({
+      id: memberId,
+      trip_id: defaultTripId,
+      display_name: cleanName,
+      role: "traveler",
+      device_client_id: clientId,
+      sort_order: nextSortOrder,
+    }),
+  });
+  await supabaseFetch("people", {
+    method: "POST",
+    prefer: "resolution=merge-duplicates,return=minimal",
+    body: JSON.stringify({
+      id: memberId,
+      name: cleanName,
+      sort_order: nextSortOrder,
+    }),
+  });
+
+  if (state.events.length) {
+    await supabaseFetch("checkins", {
+      method: "POST",
+      prefer: "resolution=merge-duplicates,return=minimal",
+      body: JSON.stringify(
+        state.events.map((event) => ({
+          event_id: event.id,
+          person_id: memberId,
+          status: "not-ready",
+        })),
+      ),
+    });
+  }
+
+  setStoredTripMemberId(memberId);
+  window.history.replaceState({}, "", window.location.pathname);
+  pendingInvite = null;
   await refreshState({ quiet: true });
 }
 
-async function releaseTraveler() {
-  if (!hasSupabase) {
-    state.activePersonId = "";
-    state.identityLocked = false;
-    render();
-    return;
+async function ensureInviteLink() {
+  if (!isOrganizerMember()) throw new Error("Only the organiser can create invite links.");
+
+  const invites = await supabaseFetch(
+    `trip_invites?trip_id=eq.${encodeURIComponent(defaultTripId)}&active=eq.true&select=*&order=created_at.desc&limit=1`,
+  );
+  let invite = invites[0];
+
+  if (!invite) {
+    invite = {
+      token: crypto.randomUUID().replaceAll("-", ""),
+      trip_id: defaultTripId,
+      created_by: getActiveTravelerId(),
+      active: true,
+    };
+    await supabaseFetch("trip_invites", {
+      method: "POST",
+      prefer: "return=minimal",
+      body: JSON.stringify(invite),
+    });
   }
 
-  await supabaseFetch(`reservations?client_id=eq.${encodeURIComponent(clientId)}`, {
-    method: "DELETE",
-    prefer: "return=minimal",
-  });
-  await refreshState({ quiet: true });
+  state.invite = invite;
+  return `${window.location.origin}${window.location.pathname}?invite=${invite.token}`;
 }
 
 async function updateCheckin(eventId, personId, status) {
@@ -606,7 +759,6 @@ async function resetTripData() {
   }
 
   await Promise.all([
-    supabaseFetch("reservations?person_id=neq.__none__", { method: "DELETE", prefer: "return=minimal" }),
     supabaseFetch("checkins?event_id=neq.__none__", { method: "DELETE", prefer: "return=minimal" }),
     supabaseFetch("events?id=neq.__none__", { method: "DELETE", prefer: "return=minimal" }),
   ]);
@@ -630,7 +782,7 @@ async function resetTripData() {
     prefer: "resolution=merge-duplicates,return=minimal",
     body: JSON.stringify(
       defaultEvents.flatMap((event) =>
-        defaultPeople.map((person) => ({
+        state.people.map((person) => ({
           event_id: event.id,
           person_id: person.id,
           status: "not-ready",
@@ -682,6 +834,41 @@ function renderTripState() {
   renderNextEvent();
 }
 
+function renderJoinGate() {
+  if (!joinGate) return;
+
+  const joined = Boolean(state.currentMember);
+  joinGate.hidden = joined;
+
+  if (joined) return;
+
+  if (!hasSupabase) {
+    joinGateTitle.textContent = "Shared mode is required to join this trip.";
+    joinGateCopy.textContent = "Connect Supabase before inviting travelers.";
+    joinForm.hidden = true;
+    joinGateStatus.textContent = "";
+    return;
+  }
+
+  if (!pendingInvite) {
+    joinGateTitle.textContent = "You need an invite to join Morocco Crew Trip.";
+    joinGateCopy.textContent = "Ask the organiser to send you the invite link.";
+    joinForm.hidden = true;
+    joinGateStatus.textContent = "";
+    return;
+  }
+
+  joinGateTitle.textContent = "You've been invited to Morocco Crew Trip.";
+  joinGateCopy.textContent = "Enter your name to join.";
+  joinForm.hidden = false;
+  joinGateStatus.textContent = "";
+}
+
+function renderOrganiserPanel() {
+  if (!organiserPanel) return;
+  organiserPanel.hidden = !isOrganizerMember();
+}
+
 function getActiveTravelerId() {
   return state.people.some((person) => person.id === state.activePersonId) ? state.activePersonId : "";
 }
@@ -691,25 +878,23 @@ function getActiveTravelerName() {
   return activePerson?.name || "your traveler";
 }
 
-function isAdminTraveler() {
-  return getActiveTravelerId() === adminTravelerId;
+function isOrganizerMember() {
+  return state.currentMember?.role === "organiser";
+}
+
+function canManageMemberAction(personId) {
+  return Boolean(getActiveTravelerId() && (isOrganizerMember() || personId === getActiveTravelerId()));
 }
 
 function renderActiveTraveler() {
-  const selected = getActiveTravelerId();
-  activeTraveler.innerHTML = [
-    `<option value="">Pick your traveler</option>`,
-    ...state.people.map((person, index) => {
-      const owner = state.reservations?.[person.id];
-      const takenBySomeoneElse = Boolean(owner && owner !== clientId);
-      const label = `${index + 1}. ${person.name}${takenBySomeoneElse ? " - taken" : ""}`;
-      return `<option value="${person.id}" ${person.id === selected ? "selected" : ""} ${takenBySomeoneElse ? "disabled" : ""}>${escapeHtml(label)}</option>`;
-    }),
-  ].join("");
-  activeTraveler.value = selected;
-  activeTraveler.disabled = Boolean(state.identityLocked && selected);
-  resetIdentityButton.hidden = !state.identityLocked;
-  document.body.dataset.admin = isAdminTraveler() ? "true" : "false";
+  const currentMember = state.currentMember;
+  if (activeTravelerProfile) {
+    activeTravelerProfile.textContent = currentMember ? currentMember.name : "Not joined yet";
+  }
+  if (identityCard) {
+    identityCard.dataset.role = currentMember?.role || "";
+  }
+  document.body.dataset.admin = isOrganizerMember() ? "true" : "false";
 }
 
 function getItineraryDays() {
@@ -837,10 +1022,10 @@ function renderEventCard(event) {
       </section>
     `
     : `
-      <section class="my-status-card pick-traveler" aria-label="Pick traveler first">
+      <section class="my-status-card pick-traveler" aria-label="Join trip first">
         <p class="eyebrow">My status</p>
-        <h5>Pick your traveler first</h5>
-        <p>Choose your name above to update your status for this plan.</p>
+        <h5>Join the trip first</h5>
+        <p>Open a valid invite link to update your status for this plan.</p>
       </section>
     `;
 
@@ -870,12 +1055,25 @@ function renderEventCard(event) {
     .map((person) => {
       const status = event.checkins[person.id] || "not-ready";
       const option = getStatusOption(status);
+      const adminControl =
+        isOrganizerMember() && person.id !== activePersonId
+          ? `
+            <select class="status-admin-select" data-action="admin-checkin" data-event-id="${event.id}" data-person-id="${person.id}" aria-label="Update ${escapeAttribute(getDisplayName(person.name))} status">
+              ${statusOptions
+                .map(
+                  (statusOption) =>
+                    `<option value="${statusOption.value}" ${statusOption.value === status ? "selected" : ""}>${statusOption.label}</option>`,
+                )
+                .join("")}
+            </select>
+          `
+          : `<span class="status-pill status-${status}">${option.label}</span>`;
 
       return `
         <div class="group-status-row status-${status}">
           <span class="group-status-avatar status-${status}" aria-hidden="true">${escapeHtml(getAvatarLabel(person))}</span>
           <strong class="group-status-name">${escapeHtml(getDisplayName(person.name))}</strong>
-          <span class="status-pill status-${status}">${option.label}</span>
+          ${adminControl}
         </div>
       `;
     })
@@ -929,19 +1127,24 @@ function renderEventCard(event) {
 }
 
 function renderPeople() {
+  if (crewHeaderEyebrow) {
+    const label = state.people.length === 1 ? "traveler" : "travelers";
+    crewHeaderEyebrow.textContent = `Crew dashboard · ${state.people.length} ${label}`;
+  }
+  renderOrganiserPanel();
   peopleGrid.innerHTML = state.people
     .map((person, index) => {
-      const isClaimed = Boolean(state.reservations?.[person.id]);
-      const isAdmin = person.id === adminTravelerId;
+      const isCurrentMember = person.id === getActiveTravelerId();
+      const isAdmin = person.role === "organiser";
       return `
         <div class="person-card">
-          <div class="person-avatar${isClaimed ? "" : " open-avatar"}">${escapeHtml(getAvatarLabel(person))}</div>
+          <div class="person-avatar">${escapeHtml(getAvatarLabel(person))}</div>
           <div class="person-copy">
             <p class="eyebrow">Traveler ${index + 1}</p>
             <strong>${escapeHtml(getDisplayName(person.name))}</strong>
           </div>
           ${isAdmin ? `<span class="admin-badge">Admin</span>` : ""}
-          <span class="${isClaimed ? "claimed" : "open"}">${isClaimed ? "Claimed" : "Open"}</span>
+          ${isCurrentMember ? `<span class="claimed">You</span>` : ""}
         </div>
       `;
     })
@@ -988,11 +1191,15 @@ function renderExpenseControls() {
   const selectedPayer = expensePaidBy.value || getActiveTravelerId();
   const checkedValues = [...expenseSplitOptions.querySelectorAll("input:checked")].map((input) => input.value);
   const hasExistingChoices = expenseSplitOptions.querySelectorAll("input").length > 0;
+  const payerOptions = isOrganizerMember()
+    ? state.people
+    : state.people.filter((person) => person.id === getActiveTravelerId());
   expensePaidBy.innerHTML = [
     `<option value="">Who paid?</option>`,
-    ...state.people.map((person) => `<option value="${person.id}">${escapeHtml(person.name)}</option>`),
+    ...payerOptions.map((person) => `<option value="${person.id}">${escapeHtml(person.name)}</option>`),
   ].join("");
   expensePaidBy.value = state.people.some((person) => person.id === selectedPayer) ? selectedPayer : "";
+  expensePaidBy.disabled = Boolean(getActiveTravelerId() && !isOrganizerMember());
 
   expenseSplitOptions.innerHTML = state.people
     .map(
@@ -1015,7 +1222,7 @@ function renderExpenses() {
   const myPaid = activePersonId ? expenses.filter((expense) => expense.paidBy === activePersonId).reduce((sum, expense) => sum + expense.amount, 0) : 0;
   const myBalance = activePersonId ? totals.balances[activePersonId] || 0 : 0;
   const myBalanceText = !activePersonId
-    ? "Pick your traveler"
+    ? "Join the trip"
     : Math.abs(myBalance) < 0.01
       ? "All settled"
       : myBalance > 0
@@ -1420,8 +1627,8 @@ document.querySelectorAll(".tab-button").forEach((button) => {
 });
 
 document.querySelector("#addEventButton").addEventListener("click", () => {
-  if (!isAdminTraveler()) {
-    showToast("Only Malik can change trip plans.");
+  if (!isOrganizerMember()) {
+    showToast("Only the organiser can change trip plans.");
     return;
   }
   clearForm();
@@ -1432,21 +1639,23 @@ document.querySelector("#addEventButton").addEventListener("click", () => {
 
 document.querySelector("#cancelEditButton").addEventListener("click", clearForm);
 
-activeTraveler.addEventListener("change", async (event) => {
-  if (!event.target.value) return;
+joinForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
   try {
-    await claimTraveler(event.target.value);
-    showToast(`This device is locked to ${getActiveTravelerName()}.`);
+    joinGateStatus.textContent = "Joining trip...";
+    await joinTripFromInvite(joinName.value);
+    showToast(`Welcome, ${getActiveTravelerName()}.`);
   } catch (error) {
-    await refreshState({ quiet: true });
-    showToast(error.message);
+    joinGateStatus.textContent = error.message;
   }
 });
 
-resetIdentityButton.addEventListener("click", async () => {
+copyInviteButton?.addEventListener("click", async () => {
   try {
-    await releaseTraveler();
-    showToast("Pick the correct traveler for this device.");
+    const url = await ensureInviteLink();
+    inviteLink.value = url;
+    await navigator.clipboard.writeText(url);
+    showToast("Invite link copied.");
   } catch (error) {
     showToast(error.message);
   }
@@ -1507,8 +1716,8 @@ confirmPhotoDeleteButton.addEventListener("click", async () => {
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (!isAdminTraveler()) {
-    showToast("Only Malik can change trip plans.");
+  if (!isOrganizerMember()) {
+    showToast("Only the organiser can change trip plans.");
     return;
   }
   const eventData = {
@@ -1541,8 +1750,8 @@ form.addEventListener("submit", async (event) => {
 });
 
 document.querySelector("#resetButton").addEventListener("click", async () => {
-  if (!isAdminTraveler()) {
-    showToast("Only Malik can reset the trip.");
+  if (!isOrganizerMember()) {
+    showToast("Only the organiser can reset the trip.");
     return;
   }
   clearForm();
@@ -1577,9 +1786,22 @@ document.body.addEventListener("change", async (event) => {
   const target = event.target;
   const action = target.dataset.action;
   if (action === "checkin") {
-    if (!state.identityLocked || target.dataset.personId !== getActiveTravelerId()) {
+    if (!canManageMemberAction(target.dataset.personId)) {
       render();
-      showToast(state.identityLocked ? `This device is locked to ${getActiveTravelerName()}.` : "Pick your traveler first.");
+      showToast(state.identityLocked ? "You can only update your own status." : "Join the trip first.");
+      return;
+    }
+    try {
+      await updateCheckin(target.dataset.eventId, target.dataset.personId, target.value);
+    } catch (error) {
+      await refreshState({ quiet: true });
+      showToast(error.message);
+    }
+  }
+  if (action === "admin-checkin") {
+    if (!isOrganizerMember()) {
+      renderTripState();
+      showToast("Only the organiser can update another traveler.");
       return;
     }
     try {
@@ -1596,15 +1818,15 @@ document.body.addEventListener("click", async (event) => {
   if (!target) return;
   const action = target.dataset.action;
   if (action === "edit") {
-    if (!isAdminTraveler()) {
-      showToast("Only Malik can change trip plans.");
+    if (!isOrganizerMember()) {
+      showToast("Only the organiser can change trip plans.");
       return;
     }
     editEvent(target.dataset.eventId);
   }
   if (action === "delete") {
-    if (!isAdminTraveler()) {
-      showToast("Only Malik can change trip plans.");
+    if (!isOrganizerMember()) {
+      showToast("Only the organiser can change trip plans.");
       return;
     }
     try {
@@ -1620,9 +1842,9 @@ document.body.addEventListener("click", async (event) => {
     renderEvents();
   }
   if (action === "checkin-choice") {
-    if (!state.identityLocked || target.dataset.personId !== getActiveTravelerId()) {
+    if (!canManageMemberAction(target.dataset.personId)) {
       renderTripState();
-      showToast(state.identityLocked ? `This device is locked to ${getActiveTravelerName()}.` : "Pick your traveler first.");
+      showToast(state.identityLocked ? "You can only update your own status." : "Join the trip first.");
       return;
     }
     try {
@@ -1713,10 +1935,9 @@ function setupRealtime() {
   realtimeChannel = realtimeClient
     .channel("morocco-trip-live-state")
     .on("postgres_changes", { event: "*", schema: "public", table: "checkins" }, refreshFromRealtime)
-    .on("postgres_changes", { event: "*", schema: "public", table: "reservations" }, refreshFromRealtime)
     .on("postgres_changes", { event: "*", schema: "public", table: "events" }, refreshFromRealtime)
     .on("postgres_changes", { event: "*", schema: "public", table: "expenses" }, () => refreshExpenses({ quiet: true }))
-    .on("postgres_changes", { event: "*", schema: "public", table: "people" }, refreshFromRealtime)
+    .on("postgres_changes", { event: "*", schema: "public", table: "trip_members" }, refreshFromRealtime)
     .on(
       "postgres_changes",
       { event: "*", schema: "storage", table: "objects", filter: `bucket_id=eq.${photoBucket}` },
@@ -1738,10 +1959,9 @@ function setupRealtime() {
 
 document.body.dataset.tab = "schedule";
 render();
+renderJoinGate();
 setupRealtime();
-refreshState();
-refreshPhotos();
-refreshExpenses({ quiet: true });
+initializeApp();
 window.setInterval(() => {
   refreshState({ quiet: true });
   refreshPhotos({ quiet: true });
@@ -1749,3 +1969,15 @@ window.setInterval(() => {
   renderNextEvent();
   checkAlarms();
 }, 30000);
+
+async function initializeApp() {
+  try {
+    await loadPendingInvite();
+  } catch {
+    pendingInvite = null;
+  }
+  renderJoinGate();
+  refreshState();
+  refreshPhotos();
+  refreshExpenses({ quiet: true });
+}

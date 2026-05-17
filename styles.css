@@ -288,7 +288,7 @@ p { margin: 0; color: var(--ink-soft); }
 /* Identity becomes a small avatar pill at bottom */
 .sidebar .identity-card {
   margin-top: auto;
-  width: 56px;
+  width: 64px;
   padding: 0.5rem;
   background: var(--surface);
   border: 1px solid var(--line);
@@ -299,40 +299,18 @@ p { margin: 0; color: var(--ink-soft); }
   gap: 0.4rem;
   box-shadow: var(--shadow-1);
 }
-.sidebar .identity-card label {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.25rem;
-  width: 100%;
-}
 .sidebar .identity-card .eyebrow {
   font-size: 0.55rem;
   margin: 0;
   letter-spacing: 0.08em;
 }
-.sidebar .identity-card select {
-  width: 100%;
+.sidebar .identity-card strong {
+  max-width: 100%;
   font-size: 0.6875rem;
-  padding: 0.3rem 0.4rem;
+  line-height: 1.2;
   text-align: center;
-  text-align-last: center;
-  background: var(--bg-3);
-  border-color: var(--line);
-  color: var(--ink);
-  appearance: none;
-  -webkit-appearance: none;
-  border-radius: 8px;
+  overflow-wrap: anywhere;
 }
-.sidebar .identity-reset {
-  font-size: 0.625rem;
-  color: var(--muted);
-  background: transparent;
-  border: 0;
-  padding: 0;
-  text-decoration: none;
-}
-.sidebar .identity-reset:hover { color: var(--accent); }
 
 /* -------- Main column -------- */
 main {
@@ -999,6 +977,11 @@ select {
   color: var(--ink);
   overflow-wrap: anywhere;
 }
+.status-admin-select {
+  min-width: 128px;
+  padding-block: 0.35rem;
+  font-size: 0.75rem;
+}
 .group-status-row:hover { background: rgba(255, 255, 255, 0.05); }
 .group-status-row > :first-child { font-weight: 600; color: var(--muted); }
 
@@ -1057,6 +1040,26 @@ select {
   background: linear-gradient(135deg, var(--accent) 0%, var(--clay) 100%);
   color: var(--bg);
   border-color: transparent;
+}
+
+.organiser-panel {
+  display: grid;
+  gap: 0.8rem;
+  margin-bottom: 0.9rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid rgba(232, 168, 78, 0.22);
+  border-radius: var(--r-lg);
+  background: var(--accent-tint);
+}
+.organiser-panel h3 { margin-bottom: 0.15rem; }
+.organiser-panel p:last-child { font-size: 0.875rem; }
+.invite-actions {
+  display: flex;
+  gap: 0.55rem;
+}
+.invite-actions input {
+  min-width: 0;
+  flex: 1;
 }
 
 /* -------- Photos -------- */
@@ -1514,10 +1517,12 @@ select {
     background: var(--surface);
     gap: 0.5rem;
   }
-  .sidebar .identity-card label { flex-direction: row; align-items: center; }
   .sidebar .identity-card .eyebrow { display: none; }
-  .sidebar .identity-card select { font-size: 0.75rem; padding: 0.3rem 1.6rem 0.3rem 0.5rem; min-width: 100px; text-align: left; text-align-last: left; }
-  .sidebar .identity-reset { display: none; }
+  .sidebar .identity-card strong {
+    max-width: 150px;
+    font-size: 0.8125rem;
+    text-align: left;
+  }
 
   /* Page headers */
   .tab-panel { padding: 0 16px 24px; }
@@ -1681,6 +1686,49 @@ select {
     flex-direction: row;
     justify-content: space-between;
   }
+  .invite-actions {
+    flex-direction: column;
+  }
+  .status-admin-select {
+    grid-column: 2;
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+/* -------- Invite join gate -------- */
+.join-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(13, 11, 9, 0.88);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.join-gate[hidden] { display: none; }
+.join-card {
+  width: min(420px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  padding: 1.25rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+}
+.join-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+.join-status {
+  min-height: 1.2rem;
+  color: var(--muted);
+  font-size: 0.8125rem;
 }
 
 /* -------- Confirm sheet -------- */

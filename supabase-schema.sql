@@ -4,6 +4,32 @@ create table if not exists people (
   sort_order integer not null
 );
 
+create table if not exists trips (
+  id text primary key,
+  name text not null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists trip_members (
+  id text primary key,
+  trip_id text not null references trips(id) on delete cascade,
+  display_name text not null,
+  role text not null check (role in ('organiser', 'traveler')),
+  user_id uuid,
+  device_client_id text unique,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists trip_invites (
+  token text primary key,
+  trip_id text not null references trips(id) on delete cascade,
+  created_by text references trip_members(id) on delete set null,
+  active boolean not null default true,
+  expires_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists events (
   id text primary key,
   title text not null,
@@ -39,12 +65,16 @@ create table if not exists expenses (
 );
 
 alter table people enable row level security;
+alter table trips enable row level security;
+alter table trip_members enable row level security;
+alter table trip_invites enable row level security;
 alter table events enable row level security;
 alter table checkins enable row level security;
 alter table reservations enable row level security;
 alter table expenses enable row level security;
 
 drop policy if exists "public read people" on people;
+drop policy if exists "public insert mirrored people" on people;
 drop policy if exists "public write people" on people;
 drop policy if exists "public read events" on events;
 drop policy if exists "public write events" on events;
@@ -54,8 +84,17 @@ drop policy if exists "public read reservations" on reservations;
 drop policy if exists "public write reservations" on reservations;
 drop policy if exists "public read expenses" on expenses;
 drop policy if exists "public write expenses" on expenses;
+drop policy if exists "public read trips" on trips;
+drop policy if exists "public read trip members" on trip_members;
+drop policy if exists "public write trip members" on trip_members;
+drop policy if exists "public read trip invites" on trip_invites;
+drop policy if exists "public write trip invites" on trip_invites;
 
 create policy "public read people" on people for select using (true);
+create policy "public insert mirrored people"
+on people
+for insert
+with check (exists (select 1 from trip_members where trip_members.id = people.id));
 create policy "public read events" on events for select using (true);
 create policy "public write events" on events for all using (true) with check (true);
 create policy "public read checkins" on checkins for select using (true);
@@ -64,6 +103,11 @@ create policy "public read reservations" on reservations for select using (true)
 create policy "public write reservations" on reservations for all using (true) with check (true);
 create policy "public read expenses" on expenses for select using (true);
 create policy "public write expenses" on expenses for all using (true) with check (true);
+create policy "public read trips" on trips for select using (true);
+create policy "public read trip members" on trip_members for select using (true);
+create policy "public write trip members" on trip_members for all using (true) with check (true);
+create policy "public read trip invites" on trip_invites for select using (true);
+create policy "public write trip invites" on trip_invites for all using (true) with check (true);
 
 insert into people (id, name, sort_order) values
   ('traveler-1', 'Traveler 1', 1),
@@ -75,6 +119,24 @@ insert into people (id, name, sort_order) values
   ('traveler-7', 'Traveler 7', 7)
 on conflict (id) do update set
   name = excluded.name,
+  sort_order = excluded.sort_order;
+
+insert into trips (id, name)
+values ('morocco-crew-2026', 'Morocco Crew Trip')
+on conflict (id) do update set name = excluded.name;
+
+insert into trip_members (id, trip_id, display_name, role, sort_order) values
+  ('traveler-1', 'morocco-crew-2026', 'Traveler 1', 'organiser', 1),
+  ('traveler-2', 'morocco-crew-2026', 'Traveler 2', 'traveler', 2),
+  ('traveler-3', 'morocco-crew-2026', 'Traveler 3', 'traveler', 3),
+  ('traveler-4', 'morocco-crew-2026', 'Traveler 4', 'traveler', 4),
+  ('traveler-5', 'morocco-crew-2026', 'Traveler 5', 'traveler', 5),
+  ('traveler-6', 'morocco-crew-2026', 'Traveler 6', 'traveler', 6),
+  ('traveler-7', 'morocco-crew-2026', 'Traveler 7', 'traveler', 7)
+on conflict (id) do update set
+  trip_id = excluded.trip_id,
+  display_name = excluded.display_name,
+  role = excluded.role,
   sort_order = excluded.sort_order;
 
 insert into events (id, title, location, starts_at, notes, alarm_offset, alarmed) values
