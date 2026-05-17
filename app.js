@@ -18,13 +18,7 @@ const currencyFormatter = new Intl.NumberFormat(undefined, {
 });
 
 const defaultPeople = [
-  { id: "traveler-1", name: "Traveler 1", sort_order: 1 },
-  { id: "traveler-2", name: "Traveler 2", sort_order: 2 },
-  { id: "traveler-3", name: "Traveler 3", sort_order: 3 },
-  { id: "traveler-4", name: "Traveler 4", sort_order: 4 },
-  { id: "traveler-5", name: "Traveler 5", sort_order: 5 },
-  { id: "traveler-6", name: "Traveler 6", sort_order: 6 },
-  { id: "traveler-7", name: "Traveler 7", sort_order: 7 },
+  { id: "traveler-1", name: "Malik", sort_order: 1 },
 ];
 
 const defaultEvents = [
@@ -599,34 +593,6 @@ async function joinTripFromInvite(displayName) {
   const cleanName = displayName.trim();
   if (!cleanName) throw new Error("Enter your name to join.");
 
-  const normalizedName = cleanName.toLocaleLowerCase();
-  const matchingMember = state.people.find(
-    (person) =>
-      getDisplayName(person.name).toLocaleLowerCase() === normalizedName &&
-      !person.deviceClientId,
-  );
-  const alreadyJoined = state.people.find(
-    (person) =>
-      getDisplayName(person.name).toLocaleLowerCase() === normalizedName &&
-      person.deviceClientId,
-  );
-  if (alreadyJoined) {
-    throw new Error("That traveler has already joined.");
-  }
-
-  if (matchingMember) {
-    await supabaseFetch(`trip_members?id=eq.${encodeURIComponent(matchingMember.id)}`, {
-      method: "PATCH",
-      prefer: "return=minimal",
-      body: JSON.stringify({ device_client_id: clientId }),
-    });
-    setStoredTripMemberId(matchingMember.id);
-    window.history.replaceState({}, "", window.location.pathname);
-    pendingInvite = null;
-    await refreshState({ quiet: true });
-    return;
-  }
-
   const nextSortOrder = Math.max(0, ...state.people.map((person) => person.sortOrder || 0)) + 1;
   const memberId = crypto.randomUUID();
   await supabaseFetch("trip_members", {
@@ -641,16 +607,6 @@ async function joinTripFromInvite(displayName) {
       sort_order: nextSortOrder,
     }),
   });
-  await supabaseFetch("people", {
-    method: "POST",
-    prefer: "resolution=merge-duplicates,return=minimal",
-    body: JSON.stringify({
-      id: memberId,
-      name: cleanName,
-      sort_order: nextSortOrder,
-    }),
-  });
-
   setStoredTripMemberId(memberId);
   window.history.replaceState({}, "", window.location.pathname);
   pendingInvite = null;
@@ -743,13 +699,25 @@ async function deleteTraveler(personId) {
   if (!traveler) throw new Error("Traveler not found.");
   if (traveler.role === "organiser") throw new Error("The organiser cannot be deleted.");
 
-  await supabaseFetch(`people?id=eq.${encodeURIComponent(personId)}`, {
-    method: "DELETE",
-    prefer: "return=minimal",
-  });
   await supabaseFetch(`trip_members?id=eq.${encodeURIComponent(personId)}`, {
     method: "DELETE",
     prefer: "return=minimal",
+  });
+  await refreshState({ quiet: true });
+}
+
+async function renameTraveler(personId, displayName) {
+  if (!isOrganizerMember()) throw new Error("Only the organiser can rename travelers.");
+  const traveler = state.people.find((person) => person.id === personId);
+  if (!traveler) throw new Error("Traveler not found.");
+  if (traveler.role === "organiser") throw new Error("The organiser name is managed separately.");
+  const cleanName = displayName.trim();
+  if (!cleanName) throw new Error("Enter a traveler name.");
+
+  await supabaseFetch(`trip_members?id=eq.${encodeURIComponent(personId)}`, {
+    method: "PATCH",
+    prefer: "return=minimal",
+    body: JSON.stringify({ display_name: cleanName }),
   });
   await refreshState({ quiet: true });
 }
@@ -1273,7 +1241,10 @@ function renderPeople() {
             ${isCurrentMember ? `<span class="claimed">You</span>` : ""}
             ${
               isOrganizerMember() && !isAdmin
-                ? `<button class="person-delete-button" type="button" data-action="delete-traveler" data-person-id="${person.id}" data-person-name="${escapeAttribute(getDisplayName(person.name))}">Delete</button>`
+                ? `
+                  <button class="person-edit-button" type="button" data-action="rename-traveler" data-person-id="${person.id}" data-person-name="${escapeAttribute(getDisplayName(person.name))}">Rename</button>
+                  <button class="person-delete-button" type="button" data-action="delete-traveler" data-person-id="${person.id}" data-person-name="${escapeAttribute(getDisplayName(person.name))}">Delete</button>
+                `
                 : ""
             }
           </div>
@@ -1978,7 +1949,22 @@ document.body.addEventListener("click", async (event) => {
       await deleteTraveler(target.dataset.personId);
       showToast(`${travelerName} deleted.`);
     } catch (error) {
-      showToast(error.message.includes("foreign key") ? "This traveler has shared expenses and cannot be deleted yet." : error.message);
+      showToast(error.message.includes("foreign key") ? "This traveler has trip activity and cannot be deleted yet." : error.message);
+    }
+  }
+  if (action === "rename-traveler") {
+    if (!isOrganizerMember()) {
+      showToast("Only the organiser can rename travelers.");
+      return;
+    }
+    const currentName = target.dataset.personName || "";
+    const nextName = window.prompt("Rename traveler", currentName);
+    if (nextName === null || nextName.trim() === currentName) return;
+    try {
+      await renameTraveler(target.dataset.personId, nextName);
+      showToast("Traveler renamed.");
+    } catch (error) {
+      showToast(error.message);
     }
   }
   if (action === "open-plans") {

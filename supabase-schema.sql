@@ -1,9 +1,3 @@
-create table if not exists people (
-  id text primary key,
-  name text not null,
-  sort_order integer not null
-);
-
 create table if not exists trips (
   id text primary key,
   name text not null,
@@ -42,46 +36,33 @@ create table if not exists events (
 
 create table if not exists checkins (
   event_id text not null references events(id) on delete cascade,
-  person_id text not null references people(id) on delete cascade,
+  person_id text not null references trip_members(id) on delete restrict,
   status text not null default 'not-ready',
   primary key (event_id, person_id)
-);
-
-create table if not exists reservations (
-  person_id text primary key references people(id) on delete cascade,
-  client_id text not null,
-  claimed_at timestamptz not null default now()
 );
 
 create table if not exists expenses (
   id text primary key,
   description text not null,
   amount numeric(10, 2) not null check (amount > 0),
-  paid_by text not null references people(id) on delete restrict,
+  paid_by text not null references trip_members(id) on delete restrict,
   split_between jsonb not null default '[]'::jsonb,
   paid_people jsonb not null default '[]'::jsonb,
   spent_at date not null default current_date,
   created_at timestamptz not null default now()
 );
 
-alter table people enable row level security;
 alter table trips enable row level security;
 alter table trip_members enable row level security;
 alter table trip_invites enable row level security;
 alter table events enable row level security;
 alter table checkins enable row level security;
-alter table reservations enable row level security;
 alter table expenses enable row level security;
 
-drop policy if exists "public read people" on people;
-drop policy if exists "public insert mirrored people" on people;
-drop policy if exists "public write people" on people;
 drop policy if exists "public read events" on events;
 drop policy if exists "public write events" on events;
 drop policy if exists "public read checkins" on checkins;
 drop policy if exists "public write checkins" on checkins;
-drop policy if exists "public read reservations" on reservations;
-drop policy if exists "public write reservations" on reservations;
 drop policy if exists "public read expenses" on expenses;
 drop policy if exists "public write expenses" on expenses;
 drop policy if exists "public read trips" on trips;
@@ -90,17 +71,10 @@ drop policy if exists "public write trip members" on trip_members;
 drop policy if exists "public read trip invites" on trip_invites;
 drop policy if exists "public write trip invites" on trip_invites;
 
-create policy "public read people" on people for select using (true);
-create policy "public insert mirrored people"
-on people
-for insert
-with check (exists (select 1 from trip_members where trip_members.id = people.id));
 create policy "public read events" on events for select using (true);
 create policy "public write events" on events for all using (true) with check (true);
 create policy "public read checkins" on checkins for select using (true);
 create policy "public write checkins" on checkins for all using (true) with check (true);
-create policy "public read reservations" on reservations for select using (true);
-create policy "public write reservations" on reservations for all using (true) with check (true);
 create policy "public read expenses" on expenses for select using (true);
 create policy "public write expenses" on expenses for all using (true) with check (true);
 create policy "public read trips" on trips for select using (true);
@@ -109,30 +83,12 @@ create policy "public write trip members" on trip_members for all using (true) w
 create policy "public read trip invites" on trip_invites for select using (true);
 create policy "public write trip invites" on trip_invites for all using (true) with check (true);
 
-insert into people (id, name, sort_order) values
-  ('traveler-1', 'Traveler 1', 1),
-  ('traveler-2', 'Traveler 2', 2),
-  ('traveler-3', 'Traveler 3', 3),
-  ('traveler-4', 'Traveler 4', 4),
-  ('traveler-5', 'Traveler 5', 5),
-  ('traveler-6', 'Traveler 6', 6),
-  ('traveler-7', 'Traveler 7', 7)
-on conflict (id) do update set
-  name = excluded.name,
-  sort_order = excluded.sort_order;
-
 insert into trips (id, name)
 values ('morocco-crew-2026', 'Morocco Crew Trip')
 on conflict (id) do update set name = excluded.name;
 
 insert into trip_members (id, trip_id, display_name, role, sort_order) values
-  ('traveler-1', 'morocco-crew-2026', 'Traveler 1', 'organiser', 1),
-  ('traveler-2', 'morocco-crew-2026', 'Traveler 2', 'traveler', 2),
-  ('traveler-3', 'morocco-crew-2026', 'Traveler 3', 'traveler', 3),
-  ('traveler-4', 'morocco-crew-2026', 'Traveler 4', 'traveler', 4),
-  ('traveler-5', 'morocco-crew-2026', 'Traveler 5', 'traveler', 5),
-  ('traveler-6', 'morocco-crew-2026', 'Traveler 6', 'traveler', 6),
-  ('traveler-7', 'morocco-crew-2026', 'Traveler 7', 'traveler', 7)
+  ('traveler-1', 'morocco-crew-2026', 'Malik', 'organiser', 1)
 on conflict (id) do update set
   trip_id = excluded.trip_id,
   display_name = excluded.display_name,
@@ -164,9 +120,3 @@ on conflict (id) do update set
   notes = excluded.notes,
   alarm_offset = excluded.alarm_offset,
   alarmed = excluded.alarmed;
-
-insert into checkins (event_id, person_id, status)
-select events.id, people.id, 'not-ready'
-from events
-cross join people
-on conflict (event_id, person_id) do nothing;

@@ -1212,12 +1212,32 @@ select {
     border-color var(--dur-2) var(--ease-out),
     transform var(--dur-1) var(--ease-out);
 }
+.person-edit-button {
+  min-height: 36px;
+  padding: 0.35rem 0.65rem;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line-strong);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 650;
+  transition:
+    background-color var(--dur-2) var(--ease-out),
+    border-color var(--dur-2) var(--ease-out),
+    transform var(--dur-1) var(--ease-out);
+}
 @media (hover: hover) and (pointer: fine) {
+  .person-edit-button:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--line-bold);
+  }
   .person-delete-button:hover {
     background: rgba(225, 90, 78, 0.2);
     border-color: rgba(225, 90, 78, 0.35);
   }
 }
+.person-edit-button:active,
 .person-delete-button:active { transform: scale(0.97); }
 
 .person-avatar {
