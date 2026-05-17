@@ -481,14 +481,6 @@ async function downloadPhoto(photoName) {
     throw new Error("That photo could not be downloaded safely.");
   }
 
-  if (isIosDevice()) {
-    const opened = window.open(photo.url, "_blank", "noopener,noreferrer");
-    if (!opened) {
-      window.location.href = photo.url;
-    }
-    return "Image opened. Long press to save to Photos.";
-  }
-
   const response = await fetch(photo.url);
   if (!response.ok) {
     throw new Error("Could not prepare that photo for download.");
@@ -504,10 +496,6 @@ async function downloadPhoto(photoName) {
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
   return "Photo download started.";
-}
-
-function isIosDevice() {
-  return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 }
 
 async function claimTraveler(personId) {

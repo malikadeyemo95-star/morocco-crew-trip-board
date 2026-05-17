@@ -165,7 +165,8 @@ p { margin: 0; color: var(--ink-soft); }
   gap: 0;
   max-width: 1400px;
   margin: 0 auto;
-  min-height: 100vh;
+  min-height: 100svh;
+  min-height: 100dvh;
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
 }
 
@@ -179,7 +180,8 @@ p { margin: 0; color: var(--ink-soft); }
   position: sticky;
   top: 0;
   align-self: start;
-  height: 100vh;
+  height: 100svh;
+  height: 100dvh;
   border-right: 1px solid var(--line);
   background: var(--bg-2);
   overflow-y: auto;
@@ -1073,6 +1075,9 @@ select {
   box-shadow: var(--shadow-1);
   transition: transform var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out);
 }
+.photo-card img {
+  aspect-ratio: 1 / 1;
+}
 .photo-card:hover { box-shadow: var(--shadow-2); border-color: var(--line-strong); }
 .photo-name {
   position: absolute;
@@ -1471,6 +1476,8 @@ select {
 @media (max-width: 880px) {
   .app-shell {
     grid-template-columns: 1fr;
+    min-height: 100svh;
+    min-height: 100dvh;
     padding: 0;
     padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 96px);
   }
@@ -1514,6 +1521,10 @@ select {
 
   /* Page headers */
   .tab-panel { padding: 0 16px 24px; }
+  .tab-panel.active {
+    min-height: calc(100svh - 180px);
+    min-height: calc(100dvh - 180px);
+  }
   .page-header {
     flex-direction: column;
     align-items: stretch;
