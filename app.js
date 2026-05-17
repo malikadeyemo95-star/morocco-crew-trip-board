@@ -886,7 +886,7 @@ function renderEventCard(event) {
       return `
         <div class="group-status-row status-${status}">
           <span class="group-status-avatar status-${status}" aria-hidden="true">${escapeHtml(getAvatarLabel(person))}</span>
-          <strong>${escapeHtml(getDisplayName(person.name))}</strong>
+          <strong class="group-status-name">${escapeHtml(getDisplayName(person.name))}</strong>
           <span class="status-pill status-${status}">${option.label}</span>
         </div>
       `;
@@ -978,7 +978,7 @@ function renderPhotos() {
           <a class="photo-link" href="${photo.url}" target="_blank" rel="noreferrer" aria-label="Open ${escapeAttribute(photo.name)}">
             <img src="${photo.url}" alt="Trip photo" loading="lazy" />
           </a>
-          <span>${escapeHtml(photo.name)}</span>
+          <span class="photo-name">${escapeHtml(photo.name)}</span>
           <div class="photo-actions">
             <button class="secondary-button photo-action" type="button" data-action="download-photo" data-photo-name="${escapeAttribute(photo.name)}">
               <span aria-hidden="true">${downloadIcon()}</span>
