@@ -76,6 +76,7 @@ let pendingInvite = null;
 let lastTripRenderSignature = "";
 
 const panels = {
+  today: document.querySelector("#todayPanel"),
   schedule: document.querySelector("#schedulePanel"),
   people: document.querySelector("#peoplePanel"),
   photos: document.querySelector("#photosPanel"),
@@ -83,6 +84,12 @@ const panels = {
 };
 
 const eventList = document.querySelector("#eventList");
+const todayEyebrow = document.querySelector("#todayEyebrow");
+const todayNextCard = document.querySelector("#todayNextCard");
+const todayActionCard = document.querySelector("#todayActionCard");
+const todayPlansEyebrow = document.querySelector("#todayPlansEyebrow");
+const todayPlansTitle = document.querySelector("#todayPlansTitle");
+const todayTimeline = document.querySelector("#todayTimeline");
 const peopleGrid = document.querySelector("#peopleGrid");
 const photoGrid = document.querySelector("#photoGrid");
 const photoUpload = document.querySelector("#photoUpload");
@@ -823,6 +830,7 @@ function render() {
 
 function renderTripState() {
   renderActiveTraveler();
+  renderToday();
   renderExpenseControls();
   renderDaySwitcher();
   renderEvents();
@@ -837,6 +845,97 @@ function getTripRenderSignature() {
     events: state.events,
     selectedDay,
   });
+}
+
+function getNextEvent() {
+  const now = Date.now();
+  return sortedEvents().find((event) => new Date(event.startsAt).getTime() >= now) || null;
+}
+
+function getFocusDay() {
+  const days = getItineraryDays();
+  if (!days.length) return "";
+  const today = getTodayKey();
+  if (days.includes(today)) return today;
+  const next = getNextEvent();
+  return next?.startsAt.slice(0, 10) || days[0];
+}
+
+function renderToday() {
+  if (!todayNextCard || !todayTimeline) return;
+  const next = getNextEvent();
+  const focusDay = getFocusDay();
+  const realToday = focusDay === getTodayKey();
+  const focusEvents = sortedEvents().filter((event) => event.startsAt.startsWith(focusDay));
+  const focusDate = focusDay ? new Date(`${focusDay}T12:00`) : null;
+  const focusLabel = focusDate
+    ? new Intl.DateTimeFormat(undefined, { weekday: "long", month: "short", day: "numeric" }).format(focusDate)
+    : "No plans";
+
+  if (todayEyebrow) todayEyebrow.textContent = realToday ? "Today" : "Next trip day";
+  if (todayPlansEyebrow) todayPlansEyebrow.textContent = realToday ? "Today's plans" : "Next trip day";
+  if (todayPlansTitle) todayPlansTitle.textContent = focusLabel;
+
+  if (!next) {
+    todayNextCard.innerHTML = `
+      <p class="eyebrow">Up next</p>
+      <h3>Trip complete</h3>
+      <p>No upcoming plans remain.</p>
+    `;
+    todayActionCard.innerHTML = `
+      <p class="eyebrow">Quick actions</p>
+      <h3>All plans complete</h3>
+      <button class="secondary-button" type="button" data-action="today-add-expense">Add expense</button>
+    `;
+  } else {
+    const readyCount = state.people.filter((person) => next.checkins[person.id] === "ready").length;
+    const activePersonId = getActiveTravelerId();
+    const activePerson = state.people.find((person) => person.id === activePersonId);
+    const activeStatus = activePerson ? normalizeReadinessStatus(next.checkins[activePerson.id]) : "not-ready";
+    const reminder = getSmartReminder(next);
+    const reminderStatus = getReminderStatus(next);
+
+    todayNextCard.innerHTML = `
+      <div class="today-card-head">
+        <p class="eyebrow">Up next</p>
+        <span class="today-countdown">${getCountdown(next.startsAt)}</span>
+      </div>
+      <h3>${escapeHtml(next.title)}</h3>
+      <p>${escapeHtml(next.location || "Location not set")} · ${formatDateTime(next.startsAt)}</p>
+      <div class="today-metrics">
+        <span class="status-pill status-ready">${readyCount} of ${state.people.length} ready</span>
+        <span class="today-reminder ${reminderStatus.tone}">${reminderStatus.label} · ${formatReminderLead(reminder.minutes)}</span>
+      </div>
+    `;
+    todayActionCard.innerHTML = `
+      <p class="eyebrow">Quick actions</p>
+      <h3>${activePerson ? escapeHtml(getDisplayName(activePerson.name)) : "Join the trip"}</h3>
+      <div class="today-actions">
+        ${
+          activePerson
+            ? `<button class="primary-button" type="button" data-action="today-ready" data-event-id="${next.id}" data-person-id="${activePerson.id}" data-status="${activeStatus === "ready" ? "not-ready" : "ready"}">${activeStatus === "ready" ? "Ready" : "Mark ready"}</button>`
+            : `<button class="primary-button" type="button" disabled>Join to mark ready</button>`
+        }
+        <button class="secondary-button" type="button" data-action="today-add-expense">Add expense</button>
+      </div>
+    `;
+  }
+
+  todayTimeline.innerHTML = focusEvents.length
+    ? focusEvents
+        .map(
+          (event) => `
+            <article class="today-timeline-item">
+              <strong>${formatTime(event.startsAt)}</strong>
+              <div>
+                <h4>${escapeHtml(event.title)}</h4>
+                <p>${escapeHtml(event.location || "Location not set")}</p>
+              </div>
+            </article>
+          `,
+        )
+        .join("")
+    : `<div class="empty-state compact"><span aria-hidden="true">Plan</span><h4>No plans for this day.</h4><p>The itinerary is clear for now.</p></div>`;
 }
 
 function renderJoinGate() {
@@ -1420,8 +1519,7 @@ function formatExpenseDate(value) {
 }
 
 function renderNextEvent() {
-  const now = Date.now();
-  const next = sortedEvents().find((event) => new Date(event.startsAt).getTime() >= now);
+  const next = getNextEvent();
   document.querySelector("#nextEventTitle").textContent = next?.title || "Trip complete";
   document.querySelector("#nextEventTime").textContent = next ? formatDateTime(next.startsAt) : "No upcoming plans";
   document.querySelector("#nextCountdown").textContent = next ? getCountdown(next.startsAt) : "Done";
@@ -1855,6 +1953,25 @@ document.body.addEventListener("click", async (event) => {
       showToast(error.message.includes("foreign key") ? "This traveler has shared expenses and cannot be deleted yet." : error.message);
     }
   }
+  if (action === "open-plans") {
+    switchTab("schedule");
+  }
+  if (action === "today-add-expense") {
+    switchTab("settings");
+    document.querySelector("#expenseDescription")?.focus();
+  }
+  if (action === "today-ready") {
+    if (!canManageMemberAction(target.dataset.personId)) {
+      showToast(state.identityLocked ? "You can only update your own status." : "Join the trip first.");
+      return;
+    }
+    try {
+      await updateCheckin(target.dataset.eventId, target.dataset.personId, target.dataset.status);
+    } catch (error) {
+      await refreshState({ quiet: true });
+      showToast(error.message);
+    }
+  }
   if (action === "select-day") {
     selectedDay = target.dataset.day || selectedDay;
     renderDaySwitcher();
@@ -1977,7 +2094,7 @@ function setupRealtime() {
     });
 }
 
-document.body.dataset.tab = "schedule";
+document.body.dataset.tab = "today";
 render();
 renderJoinGate();
 setupRealtime();
@@ -1986,6 +2103,7 @@ window.setInterval(() => {
   refreshState({ quiet: true });
   refreshPhotos({ quiet: true });
   refreshExpenses({ quiet: true });
+  renderToday();
   renderNextEvent();
   checkAlarms();
 }, 30000);

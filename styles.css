@@ -378,6 +378,7 @@ main {
   flex-shrink: 0;
 }
 .page-header-schedule .eyebrow { color: var(--accent); }
+.page-header-today .eyebrow    { color: var(--accent); }
 .page-header-people .eyebrow   { color: var(--emerald); }
 .page-header-photos .eyebrow   { color: var(--indigo); }
 .page-header-expenses .eyebrow { color: var(--accent); }
@@ -386,6 +387,135 @@ main {
 .tab-panel { display: none; animation: panelIn var(--dur-4) var(--ease-out); padding: 0 28px 40px; }
 .tab-panel.active { display: block; }
 .tab-panel > .page-header { padding-left: 0; padding-right: 0; margin-left: 0; margin-right: 0; }
+
+/* -------- Today dashboard -------- */
+.today-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.8fr);
+  gap: 0.9rem;
+}
+.today-next-card,
+.today-action-card,
+.today-day-card {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+}
+.today-next-card {
+  padding: 1.15rem 1.2rem;
+  display: grid;
+  gap: 0.45rem;
+}
+.today-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.today-next-card h3,
+.today-action-card h3,
+.today-day-card h3 {
+  font-size: 1.2rem;
+  letter-spacing: -0.02em;
+}
+.today-next-card > p { color: var(--ink-soft); }
+.today-countdown {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--r-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.today-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+  margin-top: 0.25rem;
+}
+.today-reminder {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  padding: 0.25rem 0.65rem;
+  border: 1px solid rgba(232, 168, 78, 0.22);
+  border-radius: var(--r-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.today-reminder.soon {
+  background: var(--clay-soft);
+  color: var(--clay);
+  border-color: rgba(201, 98, 64, 0.22);
+}
+.today-reminder.past {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  border-color: var(--line);
+}
+.today-action-card {
+  padding: 1.15rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.today-actions {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: auto;
+}
+.today-actions > * { width: 100%; }
+.today-day-card {
+  grid-column: 1 / -1;
+  overflow: hidden;
+}
+.today-section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 0.75rem;
+  padding: 1rem 1.15rem;
+  border-bottom: 1px solid var(--line);
+}
+.compact-button {
+  min-height: 38px;
+  --pad-y: 0.42rem;
+  --pad-x: 0.75rem;
+}
+.today-timeline {
+  display: flex;
+  flex-direction: column;
+}
+.today-timeline-item {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 0.8rem;
+  align-items: start;
+  padding: 0.85rem 1.15rem;
+  border-bottom: 1px solid var(--line);
+}
+.today-timeline-item:last-child { border-bottom: 0; }
+.today-timeline-item > strong {
+  color: var(--accent);
+  font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
+}
+.today-timeline-item h4 {
+  font-size: 0.9375rem;
+  letter-spacing: -0.01em;
+}
+.today-timeline-item p {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
 
 @keyframes panelIn {
   from { opacity: 0; transform: translateY(6px); }
@@ -1630,6 +1760,11 @@ select {
   .page-header h2 { font-size: 1.5rem; }
   .page-header-actions { width: 100%; }
   .page-header-actions > * { flex: 1; }
+  .today-grid {
+    grid-template-columns: 1fr;
+    gap: 0.7rem;
+  }
+  .today-day-card { grid-column: auto; }
 
   .event-card { grid-template-columns: 1fr; padding: 0.9rem 1rem; gap: 0.7rem; }
   .event-time {
@@ -1722,6 +1857,14 @@ select {
   .tab-panel { padding: 0 14px 24px; }
   .page-header h2 { font-size: 1.25rem; }
   .page-header .page-sub { display: none; }
+  .today-section-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .today-timeline-item {
+    grid-template-columns: 62px minmax(0, 1fr);
+    padding: 0.8rem 0.9rem;
+  }
 
   .photo-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 0.35rem; }
   .photo-actions { opacity: 1; transform: none; }
