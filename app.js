@@ -73,6 +73,7 @@ let selectedDay = "";
 let expensesShared = true;
 let realtimeStatus = "connecting";
 let pendingInvite = null;
+let lastTripRenderSignature = "";
 
 const panels = {
   schedule: document.querySelector("#schedulePanel"),
@@ -268,7 +269,11 @@ async function refreshState({ quiet = false } = {}) {
     state.reservations = {};
     state.activePersonId = currentMember?.id || "";
     state.identityLocked = Boolean(state.activePersonId);
-    renderTripState();
+    const nextRenderSignature = getTripRenderSignature();
+    if (nextRenderSignature !== lastTripRenderSignature) {
+      renderTripState();
+      lastTripRenderSignature = nextRenderSignature;
+    }
     renderJoinGate();
     checkReadyNotifications();
   } catch (error) {
@@ -724,6 +729,23 @@ async function deleteEvent(eventId) {
   await refreshState({ quiet: true });
 }
 
+async function deleteTraveler(personId) {
+  if (!isOrganizerMember()) throw new Error("Only the organiser can delete travelers.");
+  const traveler = state.people.find((person) => person.id === personId);
+  if (!traveler) throw new Error("Traveler not found.");
+  if (traveler.role === "organiser") throw new Error("The organiser cannot be deleted.");
+
+  await supabaseFetch(`people?id=eq.${encodeURIComponent(personId)}`, {
+    method: "DELETE",
+    prefer: "return=minimal",
+  });
+  await supabaseFetch(`trip_members?id=eq.${encodeURIComponent(personId)}`, {
+    method: "DELETE",
+    prefer: "return=minimal",
+  });
+  await refreshState({ quiet: true });
+}
+
 async function resetTripData() {
   if (!hasSupabase) {
     state = createDefaultState();
@@ -794,6 +816,7 @@ function sortedEvents() {
 
 function render() {
   renderTripState();
+  lastTripRenderSignature = getTripRenderSignature();
   renderPhotos();
   renderExpenses();
 }
@@ -805,6 +828,15 @@ function renderTripState() {
   renderEvents();
   renderPeople();
   renderNextEvent();
+}
+
+function getTripRenderSignature() {
+  return JSON.stringify({
+    currentMember: state.currentMember,
+    people: state.people,
+    events: state.events,
+    selectedDay,
+  });
 }
 
 function renderJoinGate() {
@@ -922,10 +954,17 @@ function renderEvents() {
   const day = ensureSelectedDay();
   const events = sortedEvents().filter((event) => event.startsAt.startsWith(day));
   const dayLabel = day ? new Intl.DateTimeFormat(undefined, { weekday: "long" }).format(new Date(`${day}T12:00`)) : "this day";
+  const openStatusEventIds = new Set(
+    [...eventList.querySelectorAll(".group-status-details[open]")].map((details) => details.dataset.eventId),
+  );
 
   eventList.innerHTML = events.length
     ? events.map(renderEventCard).join("")
     : `<div class="empty-state"><span aria-hidden="true">Plan</span><h4>No activities planned for ${dayLabel} yet.</h4><p>Add a plan when the crew has something locked in.</p></div>`;
+
+  openStatusEventIds.forEach((eventId) => {
+    eventList.querySelector(`.group-status-details[data-event-id="${CSS.escape(eventId)}"]`)?.setAttribute("open", "");
+  });
 }
 
 function getStatusOption(status) {
@@ -1074,7 +1113,7 @@ function renderEventCard(event) {
               <span class="status-summary-chip status-ready"><strong>${readyCount}</strong> Ready</span>
               <span class="status-summary-chip status-not-ready"><strong>${notReadyCount}</strong> Not ready</span>
             </div>
-            <details class="group-status-details">
+            <details class="group-status-details" data-event-id="${event.id}">
               <summary>View all travelers</summary>
               <div class="group-status-list">${groupStatuses}</div>
             </details>
@@ -1102,8 +1141,15 @@ function renderPeople() {
             <p class="eyebrow">Traveler ${index + 1}</p>
             <strong>${escapeHtml(getDisplayName(person.name))}</strong>
           </div>
-          ${isAdmin ? `<span class="admin-badge">Admin</span>` : ""}
-          ${isCurrentMember ? `<span class="claimed">You</span>` : ""}
+          <div class="person-actions">
+            ${isAdmin ? `<span class="admin-badge">Admin</span>` : ""}
+            ${isCurrentMember ? `<span class="claimed">You</span>` : ""}
+            ${
+              isOrganizerMember() && !isAdmin
+                ? `<button class="person-delete-button" type="button" data-action="delete-traveler" data-person-id="${person.id}" data-person-name="${escapeAttribute(getDisplayName(person.name))}">Delete</button>`
+                : ""
+            }
+          </div>
         </div>
       `;
     })
@@ -1795,10 +1841,25 @@ document.body.addEventListener("click", async (event) => {
       showToast(error.message);
     }
   }
+  if (action === "delete-traveler") {
+    if (!isOrganizerMember()) {
+      showToast("Only the organiser can delete travelers.");
+      return;
+    }
+    const travelerName = target.dataset.personName || "this traveler";
+    if (!window.confirm(`Delete ${travelerName} from the crew?`)) return;
+    try {
+      await deleteTraveler(target.dataset.personId);
+      showToast(`${travelerName} deleted.`);
+    } catch (error) {
+      showToast(error.message.includes("foreign key") ? "This traveler has shared expenses and cannot be deleted yet." : error.message);
+    }
+  }
   if (action === "select-day") {
     selectedDay = target.dataset.day || selectedDay;
     renderDaySwitcher();
     renderEvents();
+    lastTripRenderSignature = getTripRenderSignature();
   }
   if (action === "checkin-choice") {
     if (!canManageMemberAction(target.dataset.personId)) {
