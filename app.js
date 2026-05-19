@@ -1,5 +1,6 @@
 const clientIdKey = "moroccoCrewClientId";
 const tripMemberIdKey = "moroccoTripMemberId";
+const activeTripIdKey = "moroccoActiveTripId";
 const readyNotificationKey = "moroccoReadyNotifications";
 const smartReminderKey = "moroccoSmartReminders";
 const localExpensesKey = "moroccoCrewExpenses";
@@ -10,12 +11,6 @@ const statusOptions = [
   { value: "not-ready", label: "Not ready" },
   { value: "ready", label: "Ready" },
 ];
-
-const currencyFormatter = new Intl.NumberFormat(undefined, {
-  style: "currency",
-  currency: "EUR",
-  maximumFractionDigits: 2,
-});
 
 const defaultPeople = [
   { id: "traveler-1", name: "Malik", sort_order: 1 },
@@ -57,6 +52,7 @@ const realtimeClient =
     ? window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey)
     : null;
 const clientId = getClientId();
+let authSession = null;
 let state = createDefaultState();
 let editingEventId = null;
 let realtimeChannel = null;
@@ -122,6 +118,27 @@ const expenseList = document.querySelector("#expenseList");
 const expenseSyncNotice = document.querySelector("#expenseSyncNotice");
 const tripSetupDetails = document.querySelector("#tripSetupDetails");
 const liveSyncBanner = document.querySelector("#liveSyncBanner");
+const authGate = document.querySelector("#authGate");
+const authForm = document.querySelector("#authForm");
+const authName = document.querySelector("#authName");
+const authEmail = document.querySelector("#authEmail");
+const authPassword = document.querySelector("#authPassword");
+const authMode = document.querySelector("#authMode");
+const authSubmitButton = document.querySelector("#authSubmitButton");
+const authToggleButton = document.querySelector("#authToggleButton");
+const authStatus = document.querySelector("#authStatus");
+const tripLobby = document.querySelector("#tripLobby");
+const tripList = document.querySelector("#tripList");
+const createTripForm = document.querySelector("#createTripForm");
+const tripName = document.querySelector("#tripName");
+const tripCountry = document.querySelector("#tripCountry");
+const tripCity = document.querySelector("#tripCity");
+const tripStartDate = document.querySelector("#tripStartDate");
+const tripEndDate = document.querySelector("#tripEndDate");
+const tripCurrency = document.querySelector("#tripCurrency");
+const tripLobbyStatus = document.querySelector("#tripLobbyStatus");
+const openTripsButton = document.querySelector("#openTripsButton");
+const signOutButton = document.querySelector("#signOutButton");
 
 function getClientId() {
   let saved = localStorage.getItem(clientIdKey);
@@ -133,20 +150,43 @@ function getClientId() {
 }
 
 function getStoredTripMemberId() {
-  return localStorage.getItem(tripMemberIdKey) || "";
+  const tripId = getActiveTripId();
+  return localStorage.getItem(`trip:${tripId}:memberId`) || (tripId === defaultTripId ? localStorage.getItem(tripMemberIdKey) || "" : "");
 }
 
 function setStoredTripMemberId(memberId) {
+  const tripId = getActiveTripId();
   if (memberId) {
-    localStorage.setItem(tripMemberIdKey, memberId);
+    localStorage.setItem(`trip:${tripId}:memberId`, memberId);
+    if (tripId === defaultTripId) localStorage.setItem(tripMemberIdKey, memberId);
     return;
   }
-  localStorage.removeItem(tripMemberIdKey);
+  localStorage.removeItem(`trip:${tripId}:memberId`);
+  if (tripId === defaultTripId) localStorage.removeItem(tripMemberIdKey);
+}
+
+function getStoredActiveTripId() {
+  return localStorage.getItem(activeTripIdKey) || defaultTripId;
+}
+
+function getActiveTripId() {
+  return state?.activeTripId || getStoredActiveTripId();
+}
+
+function setActiveTripId(tripId) {
+  const nextTripId = tripId || defaultTripId;
+  state.activeTripId = nextTripId;
+  localStorage.setItem(activeTripIdKey, nextTripId);
+  selectedDay = "";
+  lastTripRenderSignature = "";
 }
 
 function createDefaultState() {
   return {
     version: "supabase-ready-v1",
+    appView: "auth",
+    activeTripId: getStoredActiveTripId(),
+    trips: [],
     trip: null,
     activePersonId: "",
     identityLocked: false,
@@ -161,9 +201,10 @@ function createDefaultState() {
 }
 
 function supabaseHeaders(prefer) {
+  const token = authSession?.access_token || config.supabaseAnonKey;
   return {
     apikey: config.supabaseAnonKey,
-    Authorization: `Bearer ${config.supabaseAnonKey}`,
+    Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
     ...(prefer ? { Prefer: prefer } : {}),
   };
@@ -189,9 +230,10 @@ async function supabaseFetch(path, options = {}) {
 }
 
 async function storageFetch(path, options = {}) {
+  const token = authSession?.access_token || config.supabaseAnonKey;
   const headers = {
     apikey: config.supabaseAnonKey,
-    Authorization: `Bearer ${config.supabaseAnonKey}`,
+    Authorization: `Bearer ${token}`,
     ...(options.headers || {}),
   };
   const response = await fetch(`${config.supabaseUrl}/storage/v1/${path}`, {
@@ -209,19 +251,167 @@ async function storageFetch(path, options = {}) {
   return text ? JSON.parse(text) : null;
 }
 
+function renderAppView(view) {
+  const nextView = view || (authSession ? state.trip ? "trip" : "lobby" : "auth");
+  state.appView = nextView;
+  document.body.dataset.view = nextView;
+  if (authGate) authGate.hidden = nextView !== "auth";
+  if (tripLobby) tripLobby.hidden = nextView !== "lobby";
+}
+
+async function loadUserTrips() {
+  if (!authSession) return [];
+  const userId = authSession.user.id;
+  const [userMembers, deviceMembers] = await Promise.all([
+    supabaseFetch(`trip_members?user_id=eq.${encodeURIComponent(userId)}&select=trip_id`),
+    supabaseFetch(`trip_members?device_client_id=eq.${encodeURIComponent(clientId)}&select=trip_id`),
+  ]);
+  const tripIds = [...new Set([...userMembers, ...deviceMembers, pendingInvite || {}].map((member) => member.trip_id).filter(Boolean))];
+  if (!tripIds.length) return [];
+  const quotedIds = tripIds.map((id) => `"${id.replaceAll('"', '\\"')}"`).join(",");
+  return supabaseFetch(`trips?id=in.(${quotedIds})&select=*&order=created_at.desc`);
+}
+
+function renderTripLobby() {
+  if (!tripList) return;
+  if (!authSession) {
+    setStableHtml(tripList, "");
+    return;
+  }
+  setStableHtml(tripList, state.trips.length
+    ? state.trips
+        .map((trip) => `
+          <article class="trip-list-card">
+            <div>
+              <p class="eyebrow">${escapeHtml(trip.country || "Trip")}</p>
+              <h3>${escapeHtml(trip.name)}</h3>
+              <p>${escapeHtml([trip.city, formatTripDates(trip)].filter(Boolean).join(" · ") || "Dates not set")}</p>
+            </div>
+            <button class="primary-button" type="button" data-action="open-trip" data-trip-id="${escapeAttribute(trip.id)}">Open</button>
+          </article>
+        `)
+        .join("")
+    : `<div class="empty-state compact"><span aria-hidden="true">Trips</span><h4>No trips yet.</h4><p>Create your first private trip board.</p></div>`);
+}
+
+function formatTripDates(trip) {
+  if (!trip?.start_date && !trip?.end_date) return "";
+  const formatDate = (value) => value ? new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(`${value}T12:00`)) : "";
+  return [formatDate(trip.start_date), formatDate(trip.end_date)].filter(Boolean).join(" - ");
+}
+
+async function createTrip(data) {
+  if (!authSession) throw new Error("Sign in before creating a trip.");
+  const name = data.name.trim();
+  const country = data.country.trim();
+  if (!name) throw new Error("Add a trip name.");
+  if (!country) throw new Error("Add a country.");
+  const tripId = crypto.randomUUID();
+  const memberId = crypto.randomUUID();
+  const displayName = data.displayName?.trim() || authSession.user.user_metadata?.display_name || authSession.user.email?.split("@")[0] || "Organiser";
+
+  await supabaseFetch("trips", {
+    method: "POST",
+    prefer: "return=minimal",
+    body: JSON.stringify({
+      id: tripId,
+      name,
+      country,
+      city: data.city.trim() || null,
+      start_date: data.startDate || null,
+      end_date: data.endDate || null,
+      currency: data.currency || "EUR",
+      created_by: authSession.user.id,
+    }),
+  });
+  await supabaseFetch("trip_members", {
+    method: "POST",
+    prefer: "return=minimal",
+    body: JSON.stringify({
+      id: memberId,
+      trip_id: tripId,
+      display_name: displayName,
+      role: "organiser",
+      user_id: authSession.user.id,
+      device_client_id: clientId,
+      sort_order: 1,
+    }),
+  });
+  setActiveTripId(tripId);
+  setStoredTripMemberId(memberId);
+  await refreshState({ quiet: true });
+}
+
+function renderAuthState() {
+  if (!authGate) return;
+  const signUp = authMode?.value === "signup";
+  if (authName) authName.parentElement.hidden = !signUp;
+  if (authSubmitButton) authSubmitButton.textContent = signUp ? "Create account" : "Sign in";
+  if (authToggleButton) authToggleButton.textContent = signUp ? "I already have an account" : "Create an account";
+}
+
+function toggleAuthMode() {
+  authMode.value = authMode.value === "signup" ? "signin" : "signup";
+  authStatus.textContent = "";
+  renderAuthState();
+}
+window.__toggleAuthMode = toggleAuthMode;
+
+async function handleAuthSubmit() {
+  if (!realtimeClient) throw new Error("Supabase is not configured.");
+  const email = authEmail.value.trim();
+  const password = authPassword.value;
+  if (!email || !password) throw new Error("Enter your email and password.");
+  if (authMode.value === "signup") {
+    const { error } = await realtimeClient.auth.signUp({
+      email,
+      password,
+      options: { data: { display_name: authName.value.trim() || email.split("@")[0] } },
+    });
+    if (error) throw error;
+    authStatus.textContent = "Account created. Check your email if Supabase asks for confirmation, then sign in.";
+    authMode.value = "signin";
+    renderAuthState();
+    return;
+  }
+  const { error } = await realtimeClient.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+}
+
+async function signOut() {
+  if (!realtimeClient) return;
+  await realtimeClient.auth.signOut();
+}
+
+async function refreshAuthSession() {
+  if (!realtimeClient?.auth) return;
+  const { data } = await realtimeClient.auth.getSession();
+  authSession = data.session || null;
+}
+
 async function refreshState({ quiet = false } = {}) {
   if (!hasSupabase) {
     if (!quiet) showToast("Add Supabase config to enable shared mode.");
     render();
     return;
   }
+  if (!authSession) {
+    state.trips = [];
+    state.trip = null;
+    state.people = [];
+    state.currentMember = null;
+    state.events = [];
+    renderAppView("auth");
+    return;
+  }
 
   try {
+    const activeTripId = getActiveTripId();
     const [trips, members, events, checkins] = await Promise.all([
-      supabaseFetch(`trips?id=eq.${encodeURIComponent(defaultTripId)}&select=*`),
-      supabaseFetch(`trip_members?trip_id=eq.${encodeURIComponent(defaultTripId)}&select=*&order=sort_order.asc,created_at.asc`),
-      supabaseFetch("events?select=*&order=starts_at.asc"),
-      supabaseFetch("checkins?select=*"),
+      loadUserTrips(),
+      supabaseFetch(`trip_members?trip_id=eq.${encodeURIComponent(activeTripId)}&select=*&order=sort_order.asc,created_at.asc`),
+      supabaseFetch(`events?trip_id=eq.${encodeURIComponent(activeTripId)}&select=*&order=starts_at.asc`),
+      supabaseFetch(`checkins?trip_id=eq.${encodeURIComponent(activeTripId)}&select=*`),
     ]);
 
     const checkinMap = {};
@@ -232,9 +422,23 @@ async function refreshState({ quiet = false } = {}) {
 
     const storedMemberId = getStoredTripMemberId();
     const currentMember =
+      members.find((member) => member.user_id && member.user_id === authSession.user.id) ||
       members.find((member) => member.id === storedMemberId && member.device_client_id === clientId) ||
       members.find((member) => member.device_client_id === clientId) ||
       null;
+
+    if (currentMember && !currentMember.user_id) {
+      try {
+        await supabaseFetch(`trip_members?id=eq.${encodeURIComponent(currentMember.id)}&user_id=is.null`, {
+          method: "PATCH",
+          prefer: "return=minimal",
+          body: JSON.stringify({ user_id: authSession.user.id }),
+        });
+        currentMember.user_id = authSession.user.id;
+      } catch {
+        // Keep legacy device membership working if the transitional claim fails.
+      }
+    }
 
     if (currentMember?.id && currentMember.id !== storedMemberId) {
       setStoredTripMemberId(currentMember.id);
@@ -242,7 +446,19 @@ async function refreshState({ quiet = false } = {}) {
       setStoredTripMemberId("");
     }
 
-    state.trip = trips[0] || null;
+    state.trips = trips;
+    state.trip = trips.find((trip) => trip.id === activeTripId) || null;
+    if (!state.trip) {
+      const fallbackTrip = trips[0];
+      if (fallbackTrip) {
+        setActiveTripId(fallbackTrip.id);
+        await refreshState({ quiet: true });
+        return;
+      }
+      renderAppView("lobby");
+      renderTripLobby();
+      return;
+    }
     state.people = members.map((member) => ({
       id: member.id,
       name: member.display_name,
@@ -279,6 +495,8 @@ async function refreshState({ quiet = false } = {}) {
       lastTripRenderSignature = nextRenderSignature;
     }
     renderJoinGate();
+    renderAppView("trip");
+    renderTripLobby();
     checkReadyNotifications();
   } catch (error) {
     if (!quiet) showToast("Shared database is not reachable.");
@@ -293,24 +511,33 @@ async function refreshPhotos({ quiet = false } = {}) {
   }
 
   try {
-    const photos = await storageFetch(`object/list/${photoBucket}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        prefix: "",
-        limit: 100,
-        offset: 0,
-        sortBy: { column: "created_at", order: "desc" },
-      }),
-    });
+    const listPhotos = (prefix) =>
+      storageFetch(`object/list/${photoBucket}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prefix,
+          limit: 100,
+          offset: 0,
+          sortBy: { column: "created_at", order: "desc" },
+        }),
+      });
+    const scopedPhotos = (await listPhotos(`trips/${getActiveTripId()}/photos/`)).map((photo) => ({ ...photo, scoped: true }));
+    const legacyPhotos = getActiveTripId() === defaultTripId
+      ? (await listPhotos("")).filter((photo) => photo.name && !photo.name.includes("/")).map((photo) => ({ ...photo, legacy: true }))
+      : [];
+    const photos = [...scopedPhotos, ...legacyPhotos];
 
     state.photos = photos
       .filter((photo) => photo.name && !photo.name.endsWith("/"))
-      .map((photo) => ({
-        name: photo.name,
-        createdAt: photo.created_at,
-        url: `${config.supabaseUrl}/storage/v1/object/public/${photoBucket}/${encodeURIComponent(photo.name)}`,
-      }));
+      .map((photo) => {
+        const name = photo.legacy || photo.name.includes("/") ? photo.name : `trips/${getActiveTripId()}/photos/${photo.name}`;
+        return {
+          name,
+          createdAt: photo.created_at,
+          url: `${config.supabaseUrl}/storage/v1/object/public/${photoBucket}/${name.split("/").map(encodeURIComponent).join("/")}`,
+        };
+      });
     renderPhotos();
   } catch (error) {
     if (!quiet) showToast("Photo cloud is not reachable.");
@@ -319,14 +546,14 @@ async function refreshPhotos({ quiet = false } = {}) {
 
 function getLocalExpenses() {
   try {
-    return JSON.parse(localStorage.getItem(localExpensesKey)) || [];
+    return JSON.parse(localStorage.getItem(`trip:${getActiveTripId()}:expenses`) || localStorage.getItem(localExpensesKey)) || [];
   } catch {
     return [];
   }
 }
 
 function saveLocalExpenses() {
-  localStorage.setItem(localExpensesKey, JSON.stringify(state.expenses || []));
+  localStorage.setItem(`trip:${getActiveTripId()}:expenses`, JSON.stringify(state.expenses || []));
 }
 
 async function refreshExpenses({ quiet = false } = {}) {
@@ -338,7 +565,7 @@ async function refreshExpenses({ quiet = false } = {}) {
   }
 
   try {
-    const rows = await supabaseFetch("expenses?select=*&order=spent_at.desc");
+    const rows = await supabaseFetch(`expenses?trip_id=eq.${encodeURIComponent(getActiveTripId())}&select=*&order=spent_at.desc`);
     state.expenses = rows.map((row) => ({
       id: row.id,
       description: row.description,
@@ -392,6 +619,7 @@ async function addExpense(expense) {
     prefer: "return=minimal",
     body: JSON.stringify({
       id: nextExpense.id,
+      trip_id: getActiveTripId(),
       description: nextExpense.description,
       amount: nextExpense.amount,
       paid_by: nextExpense.paidBy,
@@ -422,6 +650,7 @@ async function importLocalExpenses() {
     body: JSON.stringify(
       expensesToImport.map((expense) => ({
         id: expense.id,
+        trip_id: getActiveTripId(),
         description: expense.description,
         amount: Number(expense.amount) || 0,
         paid_by: expense.paidBy,
@@ -498,9 +727,9 @@ function isSafePhotoName(name) {
   return (
     typeof name === "string" &&
     Boolean(name.trim()) &&
-    !name.includes("/") &&
     !name.includes("\\") &&
     !name.includes("..") &&
+    (name.startsWith(`trips/${getActiveTripId()}/photos/`) || (getActiveTripId() === defaultTripId && !name.includes("/"))) &&
     state.photos.some((photo) => photo.name === name)
   );
 }
@@ -516,8 +745,8 @@ async function uploadPhotos(files) {
 
   showToast(`Uploading ${imageFiles.length} photo${imageFiles.length === 1 ? "" : "s"}...`);
   for (const file of imageFiles) {
-    const fileName = `${Date.now()}-${clientId.slice(0, 8)}-${sanitizeFileName(file.name) || "photo.jpg"}`;
-    await storageFetch(`object/${photoBucket}/${encodeURIComponent(fileName)}`, {
+    const fileName = `trips/${getActiveTripId()}/photos/${Date.now()}-${clientId.slice(0, 8)}-${sanitizeFileName(file.name) || "photo.jpg"}`;
+    await storageFetch(`object/${photoBucket}/${fileName.split("/").map(encodeURIComponent).join("/")}`, {
       method: "POST",
       headers: {
         "Content-Type": file.type || "application/octet-stream",
@@ -538,7 +767,7 @@ async function deletePhoto(photoName) {
     throw new Error("That photo could not be deleted safely.");
   }
 
-  await storageFetch(`object/${photoBucket}/${encodeURIComponent(photoName)}`, {
+  await storageFetch(`object/${photoBucket}/${photoName.split("/").map(encodeURIComponent).join("/")}`, {
     method: "DELETE",
   });
   state.photos = state.photos.filter((photo) => photo.name !== photoName);
@@ -560,7 +789,7 @@ async function downloadPhoto(photoName) {
   const blobUrl = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = blobUrl;
-  link.download = photo.name;
+  link.download = photo.name.split("/").pop() || "trip-photo.jpg";
   document.body.append(link);
   link.click();
   link.remove();
@@ -588,23 +817,33 @@ async function loadPendingInvite() {
 }
 
 async function joinTripFromInvite(displayName) {
-  if (!pendingInvite || pendingInvite.trip_id !== defaultTripId) {
+  if (!authSession) throw new Error("Sign in before joining this trip.");
+  if (!pendingInvite) {
     throw new Error("This invite link is no longer valid.");
   }
 
   const cleanName = displayName.trim();
   if (!cleanName) throw new Error("Enter your name to join.");
 
-  const nextSortOrder = Math.max(0, ...state.people.map((person) => person.sortOrder || 0)) + 1;
+  setActiveTripId(pendingInvite.trip_id);
+  const members = await supabaseFetch(`trip_members?trip_id=eq.${encodeURIComponent(pendingInvite.trip_id)}&select=id,sort_order,user_id,device_client_id`);
+  const existingMember = members.find((member) => member.user_id === authSession.user.id || member.device_client_id === clientId);
+  if (existingMember) {
+    setStoredTripMemberId(existingMember.id);
+    await refreshState({ quiet: true });
+    return;
+  }
+  const nextSortOrder = Math.max(0, ...members.map((person) => person.sort_order || 0)) + 1;
   const memberId = crypto.randomUUID();
   await supabaseFetch("trip_members", {
     method: "POST",
     prefer: "return=minimal",
     body: JSON.stringify({
       id: memberId,
-      trip_id: defaultTripId,
+      trip_id: pendingInvite.trip_id,
       display_name: cleanName,
       role: "traveler",
+      user_id: authSession.user.id,
       device_client_id: clientId,
       sort_order: nextSortOrder,
     }),
@@ -619,14 +858,14 @@ async function ensureInviteLink() {
   if (!isOrganizerMember()) throw new Error("Only the organiser can create invite links.");
 
   const invites = await supabaseFetch(
-    `trip_invites?trip_id=eq.${encodeURIComponent(defaultTripId)}&active=eq.true&select=*&order=created_at.desc&limit=1`,
+    `trip_invites?trip_id=eq.${encodeURIComponent(getActiveTripId())}&active=eq.true&select=*&order=created_at.desc&limit=1`,
   );
   let invite = invites[0];
 
   if (!invite) {
     invite = {
       token: crypto.randomUUID().replaceAll("-", ""),
-      trip_id: defaultTripId,
+      trip_id: getActiveTripId(),
       created_by: getActiveTravelerId(),
       active: true,
     };
@@ -653,7 +892,7 @@ async function updateCheckin(eventId, personId, status) {
   await supabaseFetch("checkins", {
     method: "POST",
     prefer: "resolution=merge-duplicates,return=minimal",
-    body: JSON.stringify({ event_id: eventId, person_id: personId, status: nextStatus }),
+    body: JSON.stringify({ trip_id: getActiveTripId(), event_id: eventId, person_id: personId, status: nextStatus }),
   });
   await refreshState({ quiet: true });
 }
@@ -669,6 +908,7 @@ async function pushEvent(event) {
     prefer: "resolution=merge-duplicates,return=minimal",
     body: JSON.stringify({
       id: event.id,
+      trip_id: getActiveTripId(),
       title: event.title,
       location: event.location,
       starts_at: event.startsAt,
@@ -725,15 +965,19 @@ async function renameTraveler(personId, displayName) {
 }
 
 async function resetTripData() {
+  if (getActiveTripId() !== defaultTripId) {
+    throw new Error("Sample reset is only available for the Morocco demo trip.");
+  }
   if (!hasSupabase) {
     state = createDefaultState();
     render();
     return;
   }
 
+  const activeTripId = getActiveTripId();
   await Promise.all([
-    supabaseFetch("checkins?event_id=neq.__none__", { method: "DELETE", prefer: "return=minimal" }),
-    supabaseFetch("events?id=neq.__none__", { method: "DELETE", prefer: "return=minimal" }),
+    supabaseFetch(`checkins?trip_id=eq.${encodeURIComponent(activeTripId)}`, { method: "DELETE", prefer: "return=minimal" }),
+    supabaseFetch(`events?trip_id=eq.${encodeURIComponent(activeTripId)}`, { method: "DELETE", prefer: "return=minimal" }),
   ]);
   await supabaseFetch("events", {
     method: "POST",
@@ -741,6 +985,7 @@ async function resetTripData() {
     body: JSON.stringify(
       defaultEvents.map((event) => ({
         id: event.id,
+        trip_id: activeTripId,
         title: event.title,
         location: event.location,
         starts_at: event.startsAt,
@@ -757,6 +1002,7 @@ async function resetTripData() {
       defaultEvents.flatMap((event) =>
         state.people.map((person) => ({
           event_id: event.id,
+          trip_id: activeTripId,
           person_id: person.id,
           status: "not-ready",
         })),
@@ -953,14 +1199,14 @@ function renderJoinGate() {
   }
 
   if (!pendingInvite) {
-    joinGateTitle.textContent = "You need an invite to join Morocco Crew Trip.";
+    joinGateTitle.textContent = "You need an invite to join this trip.";
     joinGateCopy.textContent = "Ask the organiser to send you the invite link.";
     joinForm.hidden = true;
     joinGateStatus.textContent = "";
     return;
   }
 
-  joinGateTitle.textContent = "You've been invited to Morocco Crew Trip.";
+  joinGateTitle.textContent = "You've been invited to join a trip.";
   joinGateCopy.textContent = "Enter your name to join.";
   joinForm.hidden = false;
   joinGateStatus.textContent = "";
@@ -1000,6 +1246,12 @@ function renderActiveTraveler() {
   const addEventButton = document.querySelector("#addEventButton");
   if (addEventButton) addEventButton.hidden = !isOrganizerMember();
   if (tripSetupDetails) tripSetupDetails.hidden = !isOrganizerMember();
+  document.querySelectorAll("[data-trip-name]").forEach((element) => {
+    element.textContent = state.trip?.name || "Trip board";
+  });
+  document.querySelectorAll("[data-trip-meta]").forEach((element) => {
+    element.textContent = [state.trip?.country, state.trip?.city, formatTripDates(state.trip)].filter(Boolean).join(" · ") || "Private trip";
+  });
 }
 
 function getItineraryDays() {
@@ -1496,7 +1748,11 @@ function getPersonName(personId) {
 }
 
 function formatMoney(amount) {
-  return currencyFormatter.format(Number(amount) || 0);
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency: state.trip?.currency || "EUR",
+    maximumFractionDigits: 2,
+  }).format(Number(amount) || 0);
 }
 
 function formatReminderLead(minutes) {
@@ -1729,6 +1985,47 @@ function checkReadyNotifications() {
 document.querySelectorAll(".tab-button").forEach((button) => {
   button.addEventListener("click", () => switchTab(button.dataset.tab));
 });
+
+authMode?.addEventListener("change", renderAuthState);
+
+authForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    authStatus.textContent = "Working...";
+    await handleAuthSubmit();
+  } catch (error) {
+    authStatus.textContent = error.message;
+  }
+});
+
+createTripForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    tripLobbyStatus.textContent = "Creating trip...";
+    await createTrip({
+      name: tripName.value,
+      country: tripCountry.value,
+      city: tripCity.value,
+      startDate: tripStartDate.value,
+      endDate: tripEndDate.value,
+      currency: tripCurrency.value,
+      displayName: authSession?.user?.user_metadata?.display_name,
+    });
+    createTripForm.reset();
+    tripLobbyStatus.textContent = "";
+    showToast("Trip created.");
+  } catch (error) {
+    tripLobbyStatus.textContent = error.message;
+  }
+});
+
+openTripsButton?.addEventListener("click", async () => {
+  state.trips = await loadUserTrips();
+  renderTripLobby();
+  renderAppView("lobby");
+});
+
+signOutButton?.addEventListener("click", signOut);
 
 document.querySelector("#addEventButton").addEventListener("click", () => {
   if (!isOrganizerMember()) {
@@ -2054,6 +2351,14 @@ document.body.addEventListener("click", async (event) => {
       target.textContent = "Import local expenses";
     }
   }
+  if (action === "open-trip") {
+    setActiveTripId(target.dataset.tripId);
+    setupRealtime();
+    await refreshState({ quiet: true });
+    await refreshPhotos({ quiet: true });
+    await refreshExpenses({ quiet: true });
+    renderAppView("trip");
+  }
 });
 
 function scheduleRealtimeReconnect() {
@@ -2122,11 +2427,12 @@ function setupRealtime() {
 }
 
 document.body.dataset.tab = "today";
+renderAuthState();
 render();
 renderJoinGate();
-setupRealtime();
 initializeApp();
 window.setInterval(() => {
+  if (!authSession) return;
   refreshState({ quiet: true });
   refreshPhotos({ quiet: true });
   refreshExpenses({ quiet: true });
@@ -2136,13 +2442,40 @@ window.setInterval(() => {
 }, 30000);
 
 async function initializeApp() {
+  await refreshAuthSession();
+  realtimeClient?.auth?.onAuthStateChange(async (_event, session) => {
+    authSession = session || null;
+    if (!authSession) {
+      state = createDefaultState();
+      renderAppView("auth");
+      renderAuthState();
+      return;
+    }
+    await loadPendingInvite();
+    if (pendingInvite) {
+      setActiveTripId(pendingInvite.trip_id);
+    }
+    setupRealtime();
+    await refreshState({ quiet: true });
+    await refreshPhotos({ quiet: true });
+    await refreshExpenses({ quiet: true });
+  });
+  if (!authSession) {
+    renderAppView("auth");
+    renderAuthState();
+    return;
+  }
   try {
     await loadPendingInvite();
   } catch {
     pendingInvite = null;
   }
+  if (pendingInvite) {
+    setActiveTripId(pendingInvite.trip_id);
+  }
+  setupRealtime();
   renderJoinGate();
-  refreshState();
-  refreshPhotos();
-  refreshExpenses({ quiet: true });
+  await refreshState();
+  await refreshPhotos();
+  await refreshExpenses({ quiet: true });
 }

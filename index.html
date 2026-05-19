@@ -5,16 +5,101 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#0D0B09" />
     <title>Morocco Crew · Trip Board</title>
-    <link rel="stylesheet" href="styles.css?v=20260517-stable-sync" />
+    <link rel="stylesheet" href="styles.css?v=20260519-multi-trip-core" />
   </head>
   <body>
+    <section class="auth-gate" id="authGate" hidden>
+      <div class="auth-card">
+        <p class="eyebrow">Trip workspace</p>
+        <h1>Plan any country with your crew.</h1>
+        <p>Sign in to create private trip boards, invite friends, build itineraries, track readiness, share photos, and split expenses.</p>
+        <form class="auth-form" id="authForm">
+          <input id="authMode" type="hidden" value="signin" />
+          <label>
+            Name
+            <input id="authName" autocomplete="name" maxlength="60" placeholder="Your name" />
+          </label>
+          <label>
+            Email
+            <input id="authEmail" type="email" autocomplete="email" required placeholder="you@example.com" />
+          </label>
+          <label>
+            Password
+            <input id="authPassword" type="password" autocomplete="current-password" required minlength="6" placeholder="At least 6 characters" />
+          </label>
+          <button class="primary-button" id="authSubmitButton" type="submit">Sign in</button>
+          <button class="secondary-button" id="authToggleButton" type="button" onclick="window.__toggleAuthMode?.()">Create an account</button>
+        </form>
+        <p class="join-status" id="authStatus"></p>
+      </div>
+    </section>
+
+    <section class="trip-lobby" id="tripLobby" hidden>
+      <div class="trip-lobby-shell">
+        <header class="trip-lobby-header">
+          <div>
+            <p class="eyebrow">My trips</p>
+            <h1>Choose a trip board</h1>
+            <p>Create a private workspace for any country, then invite your crew.</p>
+          </div>
+          <button class="secondary-button" id="signOutButton" type="button">Sign out</button>
+        </header>
+        <div class="trip-lobby-grid">
+          <section class="trip-list" id="tripList"></section>
+          <section class="expense-card">
+            <div class="expense-card-heading">
+              <div>
+                <p class="eyebrow">Create trip</p>
+                <h4>New country board</h4>
+              </div>
+            </div>
+            <form class="expense-form" id="createTripForm">
+              <label>
+                Trip name
+                <input id="tripName" required placeholder="Greece birthday trip" />
+              </label>
+              <label>
+                Country
+                <input id="tripCountry" required placeholder="Greece" />
+              </label>
+              <label>
+                City or region
+                <input id="tripCity" placeholder="Santorini" />
+              </label>
+              <label>
+                Start date
+                <input id="tripStartDate" type="date" />
+              </label>
+              <label>
+                End date
+                <input id="tripEndDate" type="date" />
+              </label>
+              <label>
+                Currency
+                <select id="tripCurrency">
+                  <option value="EUR">EUR</option>
+                  <option value="GBP">GBP</option>
+                  <option value="USD">USD</option>
+                  <option value="MAD">MAD</option>
+                  <option value="GHS">GHS</option>
+                  <option value="AED">AED</option>
+                </select>
+              </label>
+              <button class="primary-button" type="submit">Create trip</button>
+            </form>
+            <p class="join-status" id="tripLobbyStatus"></p>
+          </section>
+        </div>
+      </div>
+    </section>
+
     <div class="app-shell">
       <aside class="sidebar" aria-label="Trip navigation">
         <div class="brand">
           <div class="brand-mark" aria-hidden="true">M</div>
           <div class="brand-text">
-            <p class="eyebrow">Aug 16 — 22 · 2026</p>
-            <h1>Morocco Crew</h1>
+              <p class="eyebrow" data-trip-meta>Private trip</p>
+              <h1 data-trip-name>Trip board</h1>
           </div>
         </div>
 
@@ -62,6 +147,7 @@
           <span class="eyebrow">You are</span>
           <strong id="activeTravelerProfile">Not joined yet</strong>
         </div>
+        <button class="secondary-button rail-button" id="openTripsButton" type="button">Trips</button>
       </aside>
 
       <main>
@@ -93,7 +179,7 @@
         <section class="tab-panel" id="schedulePanel" data-page="schedule">
           <header class="page-header page-header-schedule">
             <div class="page-header-text">
-              <p class="eyebrow">Itinerary · Marrakech</p>
+              <p class="eyebrow" data-trip-meta>Itinerary</p>
               <h2>Plans for the trip</h2>
               <p class="page-sub">Day-by-day timing, places, and notes. Tap a day to focus.</p>
             </div>
@@ -327,6 +413,6 @@
     </script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js?v=20260517-expense-reminder-photo-polish"></script>
-    <script src="app.js?v=20260517-stable-sync"></script>
+    <script src="app.js?v=20260519-multi-trip-core"></script>
   </body>
 </html>
