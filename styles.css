@@ -143,8 +143,10 @@ body::after {
 
 body[data-view="auth"] .app-shell,
 body[data-view="auth"] .mobile-tabs,
+body[data-view="auth"] .join-gate,
 body[data-view="lobby"] .app-shell,
-body[data-view="lobby"] .mobile-tabs {
+body[data-view="lobby"] .mobile-tabs,
+body[data-view="lobby"] .join-gate {
   display: none;
 }
 

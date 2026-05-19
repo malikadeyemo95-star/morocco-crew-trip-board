@@ -1184,6 +1184,10 @@ function refreshTodayClock() {
 
 function renderJoinGate() {
   if (!joinGate) return;
+  if (!authSession || state.appView !== "trip") {
+    joinGate.hidden = true;
+    return;
+  }
 
   const joined = Boolean(state.currentMember);
   joinGate.hidden = joined;
