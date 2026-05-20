@@ -196,6 +196,13 @@ body[data-view="lobby"] .join-gate {
   margin-bottom: 1.2rem;
 }
 .trip-lobby-header h1 { font-size: clamp(1.6rem, 4vw, 2.4rem); }
+.trip-lobby-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
 .trip-lobby-grid { grid-template-columns: minmax(0, 1fr) minmax(280px, 380px); align-items: start; }
 .trip-list {
   display: grid;
@@ -222,6 +229,8 @@ body[data-view="lobby"] .join-gate {
 @media (max-width: 760px) {
   .trip-lobby-grid { grid-template-columns: 1fr; }
   .trip-lobby-header { flex-direction: column; }
+  .trip-lobby-actions { width: 100%; }
+  .trip-lobby-actions > * { flex: 1; }
 }
 
 button, input, select, textarea { font: inherit; color: inherit; }

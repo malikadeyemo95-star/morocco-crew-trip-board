@@ -2281,6 +2281,9 @@ document.body.addEventListener("click", async (event) => {
     renderTripLobby();
     renderAppView("lobby");
   }
+  if (action === "close-trips") {
+    renderAppView(state.trip ? "trip" : "auth");
+  }
   if (action === "today-add-expense") {
     switchTab("settings");
     document.querySelector("#expenseDescription")?.focus();
