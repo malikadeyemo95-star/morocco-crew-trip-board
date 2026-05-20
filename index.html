@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#0D0B09" />
     <title>Morocco Crew · Trip Board</title>
-    <link rel="stylesheet" href="styles.css?v=20260519-multi-trip-core" />
+    <link rel="stylesheet" href="styles.css?v=20260520-trip-context" />
   </head>
   <body>
     <section class="auth-gate" id="authGate" hidden>
@@ -152,6 +152,19 @@
 
       <main>
         <div class="live-sync-banner" id="liveSyncBanner" role="status" aria-live="polite" hidden></div>
+        <section class="trip-context-bar" aria-label="Current trip and profile">
+          <div class="trip-context-copy">
+            <p class="eyebrow" data-trip-meta>Private trip</p>
+            <h2 data-trip-name>Trip board</h2>
+          </div>
+          <div class="trip-context-actions">
+            <div class="current-user-pill">
+              <span>You are</span>
+              <strong data-active-traveler-name>Not joined yet</strong>
+            </div>
+            <button class="secondary-button trip-switch-button" type="button" data-action="open-trips">My trips</button>
+          </div>
+        </section>
         <section class="tab-panel active" id="todayPanel" data-page="today">
           <header class="page-header page-header-today">
             <div class="page-header-text">
@@ -413,6 +426,6 @@
     </script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js?v=20260517-expense-reminder-photo-polish"></script>
-    <script src="app.js?v=20260519-invite-auth-fix"></script>
+    <script src="app.js?v=20260520-trip-context"></script>
   </body>
 </html>

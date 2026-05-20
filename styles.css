@@ -419,6 +419,62 @@ main {
   padding: 0;
 }
 
+.trip-context-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 18px 28px 0;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: linear-gradient(135deg, rgba(232, 168, 78, 0.1), rgba(255, 255, 255, 0.035));
+  box-shadow: var(--shadow-1);
+}
+.trip-context-copy {
+  min-width: 0;
+}
+.trip-context-copy h2 {
+  font-size: clamp(1.15rem, 2.4vw, 1.65rem);
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+.trip-context-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-shrink: 0;
+}
+.current-user-pill {
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.1rem;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.045);
+}
+.current-user-pill span {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  font-weight: 700;
+}
+.current-user-pill strong {
+  max-width: 170px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.86rem;
+}
+.trip-switch-button {
+  min-height: 44px;
+  white-space: nowrap;
+}
+
 .live-sync-banner {
   display: flex;
   align-items: center;
@@ -1857,6 +1913,21 @@ select {
   }
 
   /* Page headers */
+  .trip-context-bar {
+    margin: 12px 16px 0;
+    padding: 0.85rem;
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.8rem;
+  }
+  .trip-context-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .current-user-pill strong {
+    max-width: 100%;
+  }
   .tab-panel { padding: 0 16px 24px; }
   .tab-panel { animation: none; }
   .tab-panel.active {
@@ -1978,6 +2049,9 @@ select {
   .brand-text .eyebrow { font-size: 0.5625rem; }
 
   .tab-panel { padding: 0 14px 24px; }
+  .trip-context-bar { margin-inline: 14px; }
+  .trip-context-actions { grid-template-columns: 1fr; }
+  .trip-switch-button { width: 100%; }
   .page-header h2 { font-size: 1.25rem; }
   .page-header .page-sub { display: none; }
   .today-section-heading {

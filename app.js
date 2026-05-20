@@ -1243,6 +1243,9 @@ function renderActiveTraveler() {
   if (activeTravelerProfile) {
     activeTravelerProfile.textContent = currentMember ? currentMember.name : "Not joined yet";
   }
+  document.querySelectorAll("[data-active-traveler-name]").forEach((element) => {
+    element.textContent = currentMember ? currentMember.name : "Not joined yet";
+  });
   if (identityCard) {
     identityCard.dataset.role = currentMember?.role || "";
   }
@@ -2272,6 +2275,11 @@ document.body.addEventListener("click", async (event) => {
   }
   if (action === "open-plans") {
     switchTab("schedule");
+  }
+  if (action === "open-trips") {
+    state.trips = await loadUserTrips();
+    renderTripLobby();
+    renderAppView("lobby");
   }
   if (action === "today-add-expense") {
     switchTab("settings");
